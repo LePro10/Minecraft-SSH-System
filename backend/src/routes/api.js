@@ -29,12 +29,17 @@ router.post('/settings/wallpaper', wallpaperUpload.single('wallpaper'), (req, re
 
 // Files
 router.get('/files/list', (req, res) => fileController.list(req, res));
-router.get('/files/content', (req, res) => fileController.read(req, res));
+router.get('/files/read', (req, res) => fileController.read(req, res));
 router.post('/files/write', (req, res) => fileController.write(req, res));
 router.get('/files/download', (req, res) => fileController.download(req, res));
 router.post('/files/upload', upload.single('file'), (req, res) => fileController.upload(req, res));
 router.post('/files/delete', (req, res) => fileController.delete(req, res));
 router.post('/files/download-bulk', (req, res) => fileController.downloadBulk(req, res));
+router.post('/files/move', (req, res) => fileController.move(req, res));
+router.post('/files/copy', (req, res) => fileController.copy(req, res));
+router.post('/files/chmod', (req, res) => fileController.chmod(req, res));
+router.post('/files/create-dir', (req, res) => fileController.createDir(req, res));
+router.post('/files/create-file', (req, res) => fileController.createFile(req, res));
 
 // Plugins
 router.get('/plugins/search', (req, res) => pluginController.search(req, res));

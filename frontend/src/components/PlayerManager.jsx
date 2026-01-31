@@ -86,7 +86,7 @@ const PlayerManager = () => {
                     <div className={`icon-circle ${colorClass}`}>{icon}</div>
                     <div className="header-text">
                         <h3>{title}</h3>
-                        <span className="count-label">{list.length} Users Tracked</span>
+                        {list.length > 0 && <span className="count-label">{list.length} Users Tracked</span>}
                     </div>
                 </div>
                 <button className="glass-panel refresh-mini" onClick={refreshPlayers}><RefreshCw size={14} /></button>
@@ -159,7 +159,20 @@ const PlayerManager = () => {
                                     <div className="item-selection-grid">
                                         {filteredItems.map(item => (
                                             <div key={item.id} className={`item-card glass-panel ${modalData.item === item.id ? 'active' : ''}`} onClick={() => setModalData({ ...modalData, item: item.id })}>
-                                                <img src={`https://minecraft-api.vercel.app/images/items/${item.id}.png`} alt="" onError={(e) => { e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.20.1/items/${item.id}.png`; }} />
+                                                <img
+                                                    src={`https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.21/items/${item.id}.png`}
+                                                    alt={item.name}
+                                                    onError={(e) => {
+                                                        const current = e.target.src;
+                                                        if (current.includes('/1.21/')) {
+                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.20.1/items/${item.id}.png`;
+                                                        } else if (current.includes('/1.20.1/')) {
+                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.19.1/items/${item.id}.png`;
+                                                        } else if (current.includes('/1.19.1/')) {
+                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.18.2/items/${item.id}.png`;
+                                                        }
+                                                    }}
+                                                />
                                                 <span className="it-label">{item.name}</span>
                                             </div>
                                         ))}

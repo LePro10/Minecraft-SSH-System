@@ -59,6 +59,19 @@ const PluginManager = () => {
         if (isConnected) fetchInstalled();
     }, [isConnected, config.path]);
 
+    const triggerReload = async () => {
+        try {
+            await fetch(`${API_BASE}/api/mc/control`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'reload' })
+            });
+            showToast('Reload signal sent.', 'info');
+        } catch (e) {
+            showToast('Failed to trigger reload.', 'error');
+        }
+    };
+
     const handleInstall = async (plugin) => {
         if (!isConnected) return showToast('Establish SSH link first.', 'error');
         setInstalling(plugin.id);
@@ -74,7 +87,10 @@ const PluginManager = () => {
             });
             const data = await res.json();
             if (res.ok) {
-                showToast(`${plugin.name} integrated successfully.`, 'success');
+                showToast(`${plugin.name} integrated. Reload required.`, 'success', {
+                    label: 'Reload Server',
+                    onClick: () => triggerReload()
+                });
                 fetchInstalled();
             } else showToast(`Download failed: ${data.error}`, 'error');
         } catch (e) { showToast('Spiget downlink interrupted.', 'error'); }
@@ -97,7 +113,10 @@ const PluginManager = () => {
             });
             const data = await res.json();
             if (res.ok) {
-                showToast(`${plugin.name} purged from archive.`, 'success');
+                showToast(`${plugin.name} purged. Reload required.`, 'success', {
+                    label: 'Reload Server',
+                    onClick: () => triggerReload()
+                });
                 fetchInstalled();
             } else showToast(`Purge failed: ${data.error}`, 'error');
         } catch (e) { showToast('Uninstall sync failed.', 'error'); }

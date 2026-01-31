@@ -24,14 +24,12 @@ class FileController {
                         isDirectory = true;
                     }
 
-                    // Log findings for debugging
-                    console.log(`Backend -> Item: ${item.filename}, isDir: ${isDirectory}, mode: ${stats.mode.toString(8)}, long: ${item.longname ? item.longname[0] : '?'}`);
-
                     return {
                         name: item.filename,
                         isDirectory: !!isDirectory,
                         size: stats.size || 0,
-                        mtime: (stats.mtime || 0) * 1000
+                        mtime: (stats.mtime || 0) * 1000,
+                        permissions: stats.mode.toString(8).slice(-3) // Get last 3 digits e.g. 755
                     };
                 });
 
@@ -141,6 +139,38 @@ class FileController {
         }
     }
 
+    async copy(req, res) {
+        const { src, dest } = req.body;
+        if (!src || !dest) return res.status(400).json({ error: 'Source and destination required' });
+
+        try {
+            // SFTP doesn't have a native copy, use SSH cp -r
+            // Check if src is directory to add -r
+            await sshService.exec(`cp -r "${src}" "${dest}"`);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async chmod(req, res) {
+        const { path: targetPath, mode } = req.body;
+        if (!targetPath || !mode) return res.status(400).json({ error: 'Path and mode required' });
+
+        try {
+            const sftp = await sshService.getSftp();
+            // mode should be octal string or number, e.g. '755' or 0o755
+            // sftp.chmod expects number
+            const modeNum = parseInt(mode, 8);
+            sftp.chmod(targetPath, modeNum, (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true });
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
     async upload(req, res) {
         if (!req.file) return res.status(400).json({ error: 'No file' });
         const { targetDir } = req.body;
@@ -173,6 +203,53 @@ class FileController {
                     res.json({ success: true });
                 });
             }
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async move(req, res) {
+        const { src, dest } = req.body;
+        if (!src || !dest) return res.status(400).json({ error: 'Source and destination required' });
+
+        try {
+            const sftp = await sshService.getSftp();
+            sftp.rename(src, dest, (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true });
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async createDir(req, res) {
+        const { path: dirPath } = req.body;
+        if (!dirPath) return res.status(400).json({ error: 'Path required' });
+
+        try {
+            const sftp = await sshService.getSftp();
+            sftp.mkdir(dirPath, (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true });
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async createFile(req, res) {
+        const { path: filePath } = req.body;
+        if (!filePath) return res.status(400).json({ error: 'Path required' });
+
+        try {
+            const sftp = await sshService.getSftp();
+            // Create empty file
+            const stream = sftp.createWriteStream(filePath);
+            stream.on('error', (err) => res.status(500).json({ error: err.message }));
+            stream.on('finish', () => res.json({ success: true }));
+            stream.write('');
+            stream.end();
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

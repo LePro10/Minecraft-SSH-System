@@ -65,6 +65,9 @@ sshService.on('close', () => {
     logStream = null;
 });
 
+// Version Persistence
+let lastKnownVersion = null;
+
 // Log Parsing Logic
 const parseLogForPlayers = (logLine) => {
     // Regex for: [21:05:10] [Server thread/INFO]: Playername joined the game
@@ -72,6 +75,18 @@ const parseLogForPlayers = (logLine) => {
     const tpsMatch = logLine.match(/TPS from last 1m, 5m, 15m: ([\d.]+), ([\d.]+), ([\d.]+)/i);
     const joinMatch = logLine.match(/: (\w+) joined the game/i);
     const leaveMatch = logLine.match(/: (\w+) left the game/i);
+    const versionMatch = logLine.match(/Starting minecraft server version (.*)/i) || logLine.match(/This server is running (.*)/i);
+
+    if (versionMatch) {
+        // Clean up version string
+        let v = versionMatch[1];
+        if (v.includes('(MC:')) {
+            const mc = v.match(/\(MC: (.*)\)/);
+            if (mc) v = `Paper ${mc[1]}`;
+        }
+        lastKnownVersion = v;
+        io.emit('server:version', v);
+    }
     const listMatch = logLine.match(/(?:players online|There are \d+ of a max \d+ players online): (.*)/i);
     const legacyListMatch = logLine.match(/Online players \(\d+\): (.*)/i);
     const finalMatch = listMatch || legacyListMatch;
@@ -102,12 +117,35 @@ const parseLogForPlayers = (logLine) => {
 io.on('connection', (socket) => {
     console.log('Socket: Client connected');
     socket.emit('config:current', serverConfig);
+    if (lastKnownVersion) socket.emit('server:version', lastKnownVersion);
     socket.emit('ssh:status', { connected: sshService.connected });
 
     socket.on('ssh:connect', async (credentials) => {
         try {
             await sshService.connect(credentials);
             socket.emit('ssh:status', { connected: true });
+
+            // Try to fetch version from files if not known
+            if (!lastKnownVersion) {
+                // Try version.json (common in modpacks/paper layouts)
+                try {
+                    const vData = await sshService.exec(`cat ${serverConfig.path}/version.json`);
+                    const vJson = JSON.parse(vData);
+                    if (vJson.name || vJson.id) {
+                        // Clean up version string
+                        let v = vJson.name || vJson.id;
+                        // Regex to capture "1.21.4" from strings like "Paper version 1.21.4-138-main..." or "git-Paper-138 (MC: 1.21.4)"
+                        // We look for a pattern like 1.X or 1.X.X surrounded by non-digit characters or word boundaries.
+                        const match = v.match(/\b(1\.[0-9]+(\.[0-9]+)?)\b/);
+                        if (match) {
+                            const type = v.toLowerCase().includes('paper') ? 'Paper' : 'Server';
+                            v = `${type} ${match[1]}`; // Result: "Paper 1.21.4"
+                        }
+                        lastKnownVersion = v;
+                        io.emit('server:version', lastKnownVersion);
+                    }
+                } catch (e) { }
+            }
 
             if (pollInterval) clearInterval(pollInterval);
             let pollCounter = 0;
@@ -148,10 +186,19 @@ io.on('connection', (socket) => {
     socket.on('console:start', async () => {
         try {
             if (!sshService.connected) throw new Error('SSH not connected');
-            if (logStream) return;
+            if (logStream) {
+                try { logStream.destroy(); } catch (e) { }
+                logStream = null;
+            }
 
-            const logPath = `${serverConfig.path}/logs/latest.log`;
-            const command = `tail -f -n 100 ${logPath}`;
+            const logDir = `${serverConfig.path}/logs`;
+            const logPath = `${logDir}/latest.log`;
+
+            // Ensure directory and file exist so tail doesn't immediately fail
+            await sshService.exec(`mkdir -p ${logDir} && touch ${logPath}`).catch(() => { });
+
+            // Use -F to track by filename (handles rotation/re-creation on server start)
+            const command = `tail -F -n 100 ${logPath}`;
             const stream = await sshService.spawn(command);
             logStream = stream;
 
@@ -215,20 +262,25 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // Step 1: Check if screen session exists
-            const checkSession = `screen -list | grep "${serverConfig.screenName}"`;
-            try {
-                await sshService.exec(checkSession);
-            } catch (e) {
-                socket.emit('console:log', `\n[System Error] Screen session "${serverConfig.screenName}" not found. Is the server running?\n`);
-                return;
+            // Step 1: Check if screen session exists (only if no start script is used, or as a warning)
+            if (!serverConfig.startScript) {
+                const checkSession = `screen -list | grep "${serverConfig.screenName}"`;
+                try {
+                    await sshService.exec(checkSession);
+                } catch (e) {
+                    socket.emit('console:log', `\n[System Warning] Screen session "${serverConfig.screenName}" not found. If running in direct mode, please note that command input is currently disabled.\n`);
+                    return;
+                }
             }
 
             // Step 2: Execute command
-            console.log(`Executing in screen "${serverConfig.screenName}": ${command}`);
-            // Use \n instead of \r for better linux compatibility
-            const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "${command}\\n"`;
-            await sshService.exec(cmd);
+            if (serverConfig.startScript) {
+                socket.emit('console:log', `\n[System] Command Input is currently disabled in Direct Mode (non-screen). Please use screen mode for interactivity.\n`);
+            } else {
+                console.log(`Executing in screen "${serverConfig.screenName}": ${command}`);
+                const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "${command}\\n"`;
+                await sshService.exec(cmd);
+            }
         } catch (err) {
             console.error('Console error:', err.message);
             socket.emit('console:log', `\n[System Error] ${err.message}\n`);
