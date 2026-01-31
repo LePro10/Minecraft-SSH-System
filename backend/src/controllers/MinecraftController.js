@@ -8,7 +8,7 @@ class MinecraftController {
         if (!command) return res.status(400).json({ error: 'Command required' });
 
         try {
-            const cmd = `screen -S ${screenName} -p 0 -X stuff "${command}\\r"`;
+            const cmd = `screen -S ${screenName} -p 0 -X stuff "${command}\\n"`;
             await sshService.exec(cmd);
             res.json({ success: true });
         } catch (err) {
@@ -134,22 +134,31 @@ class MinecraftController {
                     // Default behavior: screen for interactivity
                     await sshService.exec(`cd "${activePath}" && screen -dmS ${screen} ${script}`);
                 } else {
-                    console.log(`Executing direct start: ${script} at ${activePath}`);
-                    // Direct execution as requested: "not in the screen"
-                    // Use nohup and & to detach. Redirecting to logs/latest.log
-                    await sshService.exec(`cd "${activePath}" && nohup ${script} >> logs/latest.log 2>&1 &`);
+                    console.log(`Executing direct start via pipe: ${script} at ${activePath}`);
+                    // Direct execution with pipe support
+                    const pipe = `${activePath}/.mc_pipe`;
+                    const startCmd = `
+                        cd "${activePath}" && \
+                        rm -f ${pipe} && \
+                        mkfifo ${pipe} && \
+                        (tail -f ${pipe} | ${script} >> logs/latest.log 2>&1 &)
+                    `.replace(/\s+/g, ' ').trim();
+                    await sshService.exec(startCmd);
                 }
             } else if (action === 'stop') {
                 try {
                     console.log(`Stopping server ${screen}...`);
                     const stopCmd = config.stopScript || 'stop';
-                    // If the script is just a word like "stop", send it to console.
-                    // If it's a path like "./stop.sh", execute it? 
-                    // Usually for MC standard is sending "stop" to console.
-                    // valid stop scripts are rare in this context, assuming console command.
-                    await sshService.exec(`screen -S ${screen} -p 0 -X stuff "${stopCmd}\\r"`);
+
+                    if (config.startScript) {
+                        // Direct mode: use pipe
+                        await sshService.exec(`echo "${stopCmd}" > "${activePath}/.mc_pipe"`);
+                    } else {
+                        // Screen mode
+                        await sshService.exec(`screen -S ${screen} -p 0 -X stuff "${stopCmd}\\n"`);
+                    }
                 } catch (e) {
-                    if (e.message && e.message.includes('No socket match')) {
+                    if (e.message && e.message.includes('No socket match') && !config.startScript) {
                         console.log('Server already stopped (no screen session).');
                     } else {
                         throw e;

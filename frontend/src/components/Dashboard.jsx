@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../context/ToastContext';
-import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio, Users, Fingerprint } from 'lucide-react';
+import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio, Users, Fingerprint, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = ({ onNavigate }) => {
@@ -13,9 +13,11 @@ const Dashboard = ({ onNavigate }) => {
     const [history, setHistory] = useState([]);
     const [historyIdx, setHistoryIdx] = useState(-1);
     const [chartData, setChartData] = useState([]);
+    const [autoScroll, setAutoScroll] = useState(true);
     const { showToast } = useToast();
 
     const logsEndRef = useRef(null);
+    const viewportRef = useRef(null);
 
     const getTpsColor = (val) => {
         if (val >= 18) return '#34c759';
@@ -36,8 +38,32 @@ const Dashboard = ({ onNavigate }) => {
     }, [isConnected]);
 
     useEffect(() => {
-        logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [logs]);
+        if (!autoScroll) return;
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        // Immediate forced snap
+        viewport.scrollTop = viewport.scrollHeight;
+
+        // Continuous enforcement for 1s after logs update to prevent "jerkiness"
+        let timer = setInterval(() => {
+            if (viewport.scrollTop !== viewport.scrollHeight) {
+                viewport.scrollTop = viewport.scrollHeight;
+            }
+        }, 50);
+
+        return () => clearInterval(timer);
+    }, [logs, autoScroll]);
+
+    const handleScroll = (e) => {
+        if (autoScroll && viewportRef.current) {
+            const viewport = viewportRef.current;
+            // Snappy snap: if user scrolls up even 1px, we slam it down
+            if (viewport.scrollTop < viewport.scrollHeight - viewport.clientHeight) {
+                viewport.scrollTop = viewport.scrollHeight;
+            }
+        }
+    };
 
     const handleKeyDown = (e) => {
         if (e.key === 'ArrowUp') {
@@ -209,6 +235,11 @@ const Dashboard = ({ onNavigate }) => {
                             <h3>Terminal Access</h3>
                         </div>
                         <div className="h-right">
+                            <button className={`op-btn ${autoScroll ? 'info-lite' : 'danger-lite'}`} onClick={() => setAutoScroll(!autoScroll)} title={autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}>
+                                {autoScroll ? <Activity size={14} /> : <Zap size={14} />}
+                            </button>
+                            <button className="op-btn danger-lite" onClick={() => clearLogs && clearLogs()} title="Clear Console Binary"><Trash2 size={14} /></button>
+                            <div className="v-sep-mini" />
                             <button className="op-btn info-lite" onClick={() => socket?.emit('console:input', { command: 'list' })} title="List Online Players"><Users size={14} /></button>
                             <button className="op-btn warning-lite" onClick={() => socket?.emit('console:input', { command: 'tps' })} title="Check Server TPS"><Activity size={14} /></button>
                             <div className="v-sep-mini" />
@@ -217,7 +248,7 @@ const Dashboard = ({ onNavigate }) => {
                             <button className="op-btn reload" onClick={() => control('reload')} title="Reload Server"><RefreshCw size={14} /></button>
                         </div>
                     </div>
-                    <div className="console-viewport">
+                    <div className="console-viewport" ref={viewportRef} onScroll={handleScroll}>
                         {logs.map((log, i) => <div key={i} className="terminal-line">{log}</div>)}
                         <div ref={logsEndRef} />
                     </div>
@@ -261,6 +292,10 @@ const Dashboard = ({ onNavigate }) => {
                         <div className="legend-item"><div className="dot r" /> Memory</div>
                     </div>
                 </div>
+            </div>
+
+            <div style={{ position: 'fixed', bottom: 10, right: 10, fontSize: '10px', opacity: 0.3, color: 'white', pointerEvents: 'none' }}>
+                Dashboard v3.0.6 | Backend {isConnected ? 'Link Active' : 'Standby'}
             </div>
 
             <style jsx>{`

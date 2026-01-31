@@ -5,7 +5,7 @@ import { User, Shield, Ban, Ghost, Search, X, HandHeart, MessageSquare, Info, Re
 import { MC_ITEMS } from '../data/items';
 
 const PlayerManager = () => {
-    const { players, persistentPlayers, refreshPlayers, isConnected } = useServer();
+    const { players, setPlayers, persistentPlayers, setPersistentPlayers, refreshPlayers, isConnected } = useServer();
     const { socket } = useSocket();
     const [searchTerm, setSearchTerm] = useState('');
     const [itemSearch, setItemSearch] = useState('');
@@ -34,9 +34,21 @@ const PlayerManager = () => {
 
         if (cmd) {
             socket.emit('console:input', { command: cmd });
+
+            // Optimistic Update for OP/DEOP
+            if (type === 'op' || type === 'deop') {
+                const isOp = (type === 'op');
+                setPlayers(prev => prev.map(p => (p.name === player ? { ...p, op: isOp } : p)));
+                setPersistentPlayers(prev => ({
+                    ...prev,
+                    cache: (prev.cache || []).map(p => ((p.name || p.username) === player ? { ...p, op: isOp } : p))
+                }));
+            }
+
             setModal(null);
             setModalData({ reason: '', count: 1, item: 'diamond', msg: '' });
-            setTimeout(refreshPlayers, 1500);
+            const refreshDelay = (type === 'op' || type === 'deop') ? 2000 : 1500;
+            setTimeout(refreshPlayers, refreshDelay);
         }
     };
 
@@ -156,23 +168,35 @@ const PlayerManager = () => {
                                         <Search size={18} />
                                         <input placeholder="Search item database..." value={itemSearch} onChange={e => setItemSearch(e.target.value)} autoFocus />
                                     </div>
-                                    <div className="item-selection-grid">
-                                        {filteredItems.map(item => (
-                                            <div key={item.id} className={`item-card glass-panel ${modalData.item === item.id ? 'active' : ''}`} onClick={() => setModalData({ ...modalData, item: item.id })}>
-                                                <img
-                                                    src={`https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.21/items/${item.id}.png`}
-                                                    alt={item.name}
-                                                    onError={(e) => {
-                                                        const current = e.target.src;
-                                                        if (current.includes('/1.21/')) {
-                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.20.1/items/${item.id}.png`;
-                                                        } else if (current.includes('/1.20.1/')) {
-                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.19.1/items/${item.id}.png`;
-                                                        } else if (current.includes('/1.19.1/')) {
-                                                            e.target.src = `https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.18.2/items/${item.id}.png`;
-                                                        }
-                                                    }}
-                                                />
+                                    <div className="item-selection-grid custom-scrollbar">
+                                        {filteredItems.filter(it => it.id !== 'air').map(item => (
+                                            <div
+                                                key={item.id}
+                                                className={`item-card glass-panel ${modalData.item === item.id ? 'active' : ''}`}
+                                                onClick={() => setModalData({ ...modalData, item: item.id })}
+                                            >
+                                                <div className="item-img-wrapper">
+                                                    <img
+                                                        src={`https://assets.mcasset.cloud/1.21.1/assets/minecraft/textures/item/${item.id}.png`}
+                                                        alt={item.name}
+                                                        className="item-texture"
+                                                        onError={(e) => {
+                                                            const current = e.target.src;
+                                                            // Logic: Try items -> Try blocks -> Try older versions -> Final fallback
+                                                            if (current.includes('/item/') && current.includes('1.21.1')) {
+                                                                e.target.src = `https://assets.mcasset.cloud/1.21.1/assets/minecraft/textures/block/${item.id}.png`;
+                                                            } else if (current.includes('/block/') && current.includes('1.21.1')) {
+                                                                e.target.src = `https://assets.mcasset.cloud/1.20.1/assets/minecraft/textures/item/${item.id}.png`;
+                                                            } else if (current.includes('/item/') && current.includes('1.20.1')) {
+                                                                e.target.src = `https://assets.mcasset.cloud/1.20.1/assets/minecraft/textures/block/${item.id}.png`;
+                                                            } else {
+                                                                e.target.onerror = null;
+                                                                e.target.style.opacity = '0.3';
+                                                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="32" height="32"%3E%3Crect width="32" height="32" fill="%23333"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-size="10"%3E?%3C/text%3E%3C/svg%3E';
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
                                                 <span className="it-label">{item.name}</span>
                                             </div>
                                         ))}
@@ -270,15 +294,24 @@ const PlayerManager = () => {
                 .m-close { border: none; background: transparent; color: var(--text-secondary); cursor: pointer; padding: 8px; }
 
                 .m-body { padding: 30px; }
-                .m-search-box { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 50px; background: rgba(0,0,0,0.2); margin-bottom: 20px; }
-                .m-search-box input { flex: 1; background: transparent; border: none; color: white; outline: none; }
+                .m-search-box { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 56px; background: rgba(0,0,0,0.4); margin-bottom: 24px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); }
+                .m-search-box input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 0.95rem; font-weight: 500; }
                 
-                .item-selection-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-height: 300px; overflow-y: auto; padding-right: 10px; margin-bottom: 20px; }
-                .item-card { padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
-                .item-card:hover { background: rgba(255,255,255,0.06); }
-                .item-card.active { border-color: var(--accent-primary); background: rgba(var(--accent-primary), 0.1); }
-                .item-card img { width: 32px; height: 32px; image-rendering: pixelated; }
-                .it-label { font-size: 0.7rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+                .item-selection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-height: 380px; overflow-y: auto; padding-right: 8px; margin-bottom: 24px; }
+                .item-card { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 16px; position: relative; }
+                .item-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.08); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+                .item-card.active { border-color: var(--accent-primary); background: rgba(0, 122, 255, 0.1); border-width: 2px; }
+                .item-card.active::after { content: '✓'; position: absolute; top: 10px; right: 10px; background: var(--accent-primary); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+                
+                .item-img-wrapper { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; position: relative; }
+                .item-texture { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; transition: 0.3s; }
+                .item-card:hover .item-texture { transform: scale(1.2) rotate(5deg); }
+                
+                .it-label { font-size: 0.75rem; font-weight: 800; color: white; line-height: 1.2; word-break: break-word; }
+
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
 
                 .quantity-row { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; }
                 .q-input { width: 80px; text-align: center; }
@@ -289,6 +322,9 @@ const PlayerManager = () => {
                 .exec-btn.kick { background: #f59e0b; color: black; }
                 .exec-btn.ban { background: #ff3b30; color: white; }
                 .exec-btn.give { background: #007aff; color: white; }
+                .exec-btn.op { background: #ffd60a; color: black; }
+                .exec-btn.deop { background: #8e8e93; color: white; }
+                .confirm-txt { margin: 30px 0; text-align: center; font-size: 1rem; color: var(--text-secondary); }
             `}</style>
         </div>
     );
