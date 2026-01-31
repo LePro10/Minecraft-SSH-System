@@ -15,32 +15,26 @@ const FileManager = () => {
     const [path, setPath] = useState('/');
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [selection, setSelection] = useState([]); // Array of file names
-    const [clipboard, setClipboard] = useState(null); // { type: 'copy'|'cut', items: [], sourcePath: '' }
-    const [editor, setEditor] = useState(null); // { path, content, original }
-    const [contextMenu, setContextMenu] = useState(null); // { x, y, item }
+    const [selection, setSelection] = useState([]);
+    const [clipboard, setClipboard] = useState(null);
+    const [editor, setEditor] = useState(null);
+    const [contextMenu, setContextMenu] = useState(null);
     const { showToast } = useToast();
     const fileInputRef = useRef(null);
 
-    // --- Server Context ---
-    const { config } = useServer(); // Need to import useServer from context
+    const { config } = useServer();
 
-    // Initial Path Load
     useEffect(() => {
         if (config && config.path && path === '/') {
             setPath(config.path);
         }
     }, [config, path]);
 
-    // Initial Fetch
     useEffect(() => {
-        if (path !== '/') fetchFiles(path); // Don't fetch root if we are waiting for config
-        else if (config && config.path) fetchFiles(config.path); // Fallback
+        if (path !== '/') fetchFiles(path);
+        else if (config && config.path) fetchFiles(config.path);
     }, [path, config]);
 
-
-
-    // --- API Interactions ---
     const fetchFiles = async (dirPath) => {
         setLoading(true);
         try {
@@ -71,7 +65,7 @@ const FileManager = () => {
                 await fetch(`${API_BASE}/api/files/delete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: targetPath, type: 'any' }) // type checked in backend usually, or assume safe
+                    body: JSON.stringify({ path: targetPath, type: 'any' })
                 });
             } catch (e) { console.error(e); }
         }
@@ -144,9 +138,7 @@ const FileManager = () => {
     const handlePaste = async () => {
         if (!clipboard || !clipboard.items.length) return;
 
-        const action = clipboard.type === 'copy' ? 'copy' : 'move'; // 'move' endpoint handles rename/move
-        // Backend 'move' is sftp.rename, 'copy' is cp -r (custom)
-
+        const action = clipboard.type === 'copy' ? 'copy' : 'move';
         let successCount = 0;
         for (const item of clipboard.items) {
             const src = `${clipboard.sourcePath}/${item}`;
@@ -167,13 +159,11 @@ const FileManager = () => {
         fetchFiles(path);
     };
 
-    // --- Drag & Drop ---
     const handleDrop = async (e, targetDir) => {
         e.preventDefault();
         const srcName = e.dataTransfer.getData('text/plain');
-        if (!srcName) return; // Could be external file?
+        if (!srcName) return;
 
-        // Internal Move
         const src = `${path}/${srcName}`;
         const dest = `${path}/${targetDir}/${srcName}`;
 
@@ -190,13 +180,11 @@ const FileManager = () => {
         } catch (e) { showToast('Move failed', 'error'); }
     };
 
-    // --- Editor Logic ---
     const openFile = async (file) => {
         if (file.isDirectory) {
             setPath(`${path}/${file.name}`.replace(/\/+/g, '/'));
             setSelection([]);
         } else {
-            // Check extension
             if (!/\.(txt|json|yml|yaml|properties|log|sh|js|md|css)$/i.test(file.name)) {
                 return showToast('File type not editable', 'info');
             }
@@ -216,7 +204,6 @@ const FileManager = () => {
         if (btn) btn.innerText = 'Saving...';
 
         try {
-            // Create a timeout promise
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -243,66 +230,62 @@ const FileManager = () => {
         }
     };
 
-    // --- UI Components ---
-    const Breadcrumbs = () => {
-        const parts = path.split('/').filter(Boolean);
-        return (
-            <div className="breadcrumbs">
-                <button className="crumb" onClick={() => setPath('/')}><HardDrive size={16} /></button>
-                {parts.map((p, i) => (
-                    <span key={i} className="crumb-group">
-                        <span className="sep">/</span>
-                        <button className="crumb" onClick={() => setPath('/' + parts.slice(0, i + 1).join('/'))}>{p}</button>
-                    </span>
-                ))}
-            </div>
-        );
-    };
-
     const getIcon = (name, isDir) => {
-        if (isDir) return <Folder className="f-icon dir" />;
-        if (name.endsWith('.json') || name.endsWith('.yml')) return <Code className="f-icon code" />;
-        if (name.endsWith('.png') || name.endsWith('.jpg')) return <Image className="f-icon img" />;
-        if (name.endsWith('.jar')) return <Archive className="f-icon zip" />;
-        return <FileText className="f-icon file" />;
+        if (isDir) return <Folder className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" size={40} />;
+        if (name.endsWith('.json') || name.endsWith('.yml')) return <Code className="text-violet-400 drop-shadow-[0_0_8px_rgba(167,139,250,0.5)]" size={40} />;
+        if (name.endsWith('.png') || name.endsWith('.jpg')) return <Image className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" size={40} />;
+        if (name.endsWith('.jar')) return <Archive className="text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]" size={40} />;
+        return <FileText className="text-blue-300 drop-shadow-[0_0_8px_rgba(147,197,253,0.3)]" size={40} />;
     };
 
     return (
-        <div className="fm-container" onClick={() => setContextMenu(null)}>
+        <div className="flex flex-col h-full overflow-hidden relative pb-4" onClick={() => setContextMenu(null)}>
             {/* Toolbar */}
-            <div className="fm-toolbar glass-panel">
-                <div className="left-tools">
-                    <button className="tool-btn" onClick={() => setPath(path.split('/').slice(0, -1).join('/') || '/')} disabled={path === '/'}>
+            <div className="liquid-card p-3 mb-6 flex items-center justify-between z-10 shrink-0">
+                <div className="flex items-center gap-4 pl-2">
+                    <button
+                        className="p-2 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors disabled:opacity-30"
+                        onClick={() => setPath(path.split('/').slice(0, -1).join('/') || '/')}
+                        disabled={path === '/'}
+                    >
                         <ArrowLeft size={18} />
                     </button>
-                    <Breadcrumbs />
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-[400px] scrollbar-hide pb-1">
+                        <button className="text-white/40 hover:text-cyan-400 font-mono transition-colors" onClick={() => setPath('/')}><HardDrive size={16} /></button>
+                        {path.split('/').filter(Boolean).map((p, i) => (
+                            <React.Fragment key={i}>
+                                <span className="text-white/20">/</span>
+                                <button className="text-sm font-bold text-white/70 hover:text-cyan-400 transition-colors whitespace-nowrap" onClick={() => setPath('/' + path.split('/').slice(0, i + 1).slice(1).join('/'))}>
+                                    {p}
+                                </button>
+                            </React.Fragment>
+                        ))}
+                    </div>
                 </div>
-                <div className="right-tools">
-                    <button className="tool-btn primary" onClick={() => setContextMenu({ type: 'create', x: 0, y: 0 })}>
-                        <Plus size={18} /> <span className="lbl">New</span>
+
+                <div className="flex items-center gap-2">
+                    <button className="p-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:scale-105 transition-transform" onClick={() => setContextMenu({ type: 'create', x: 0, y: 0 })}>
+                        <Plus size={16} /> NEW
                     </button>
-                    <button className="tool-btn" onClick={() => fileInputRef.current.click()}>
-                        <Upload size={18} /> <span className="lbl">Upload</span>
+                    <button className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors" onClick={() => fileInputRef.current.click()}>
+                        <Upload size={18} />
                     </button>
-                    <button className="tool-btn" onClick={() => fetchFiles(path)}>
-                        <RefreshCw size={18} className={loading ? 'spin' : ''} />
+                    <button className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors" onClick={() => fetchFiles(path)}>
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
                     {clipboard && (
-                        <button className="tool-btn accent-pulse" onClick={handlePaste}>
-                            <Clipboard size={18} /> Paste ({clipboard.items.length})
+                        <button className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors flex items-center gap-2 font-bold text-xs animate-pulse" onClick={handlePaste}>
+                            <Clipboard size={16} /> PASTE ({clipboard.items.length})
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* File Create Popover replacement (handled by simple context logic for now, or just prompt) 
-                Actually, let's use the dropdown if prompted manually, but I used prompts in handlers.
-                Let's stick to prompts for simplicity of code vs complex UI.
-            */}
+            {/* Simulating Create Context Menu via top-right absolute if triggered */}
             {contextMenu?.type === 'create' && (
-                <div className="ctx-menu glass-panel" style={{ top: 60, right: 120 }}>
-                    <button onClick={() => { handleCreate('folder'); setContextMenu(null); }}><Folder size={16} /> New Folder</button>
-                    <button onClick={() => { handleCreate('file'); setContextMenu(null); }}><FileText size={16} /> New File</button>
+                <div className="absolute top-20 right-10 z-50 liquid-card p-2 flex flex-col gap-1 w-48 shadow-2xl backdrop-blur-xl">
+                    <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-white/80 transition-colors text-sm font-bold" onClick={() => { handleCreate('folder'); setContextMenu(null); }}><Folder size={16} className="text-amber-400" /> New Folder</button>
+                    <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 text-white/80 transition-colors text-sm font-bold" onClick={() => { handleCreate('file'); setContextMenu(null); }}><FileText size={16} className="text-blue-400" /> New File</button>
                 </div>
             )}
 
@@ -321,15 +304,20 @@ const FileManager = () => {
                 }}
             />
 
-            {/* File Grid */}
-            <div className="file-grid-wrapper">
-                {loading && <div className="loader-overlay"><Loader2 className="spin" size={40} /></div>}
-
-                <div className="file-grid">
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto px-4 pb-10 scrollbar-thin scrollbar-thumb-white/10">
+                {loading && <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20"><Loader2 className="animate-spin text-cyan-400" size={48} /></div>}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-4">
                     {files.map(f => (
-                        <div
+                        <motion.div
+                            layout
                             key={f.name}
-                            className={`file-item ${selection.includes(f.name) ? 'selected' : ''}`}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className={`flex flex-col items-center p-4 rounded-xl cursor-pointer transition-all duration-200 border group ${selection.includes(f.name)
+                                    ? 'bg-blue-500/10 border-blue-500/30'
+                                    : 'bg-transparent border-transparent hover:bg-white/[0.03]'
+                                }`}
                             onClick={(e) => {
                                 if (e.ctrlKey) {
                                     setSelection(prev => prev.includes(f.name) ? prev.filter(n => n !== f.name) : [...prev, f.name]);
@@ -349,39 +337,41 @@ const FileManager = () => {
                             onDragOver={(e) => { if (f.isDirectory) e.preventDefault(); }}
                             onDrop={(e) => { if (f.isDirectory) handleDrop(e, f.name); }}
                         >
-                            <div className="icon-box">{getIcon(f.name, f.isDirectory)}</div>
-                            <span className="file-name">{f.name}</span>
-                            <span className="file-meta">{f.size === 0 ? '' : (f.size / 1024).toFixed(1) + ' KB'}</span>
-                        </div>
+                            <div className="mb-3 transition-transform duration-300 group-hover:scale-110 group-active:scale-95">
+                                {getIcon(f.name, f.isDirectory)}
+                            </div>
+                            <span className="text-xs font-medium text-white/90 text-center line-clamp-2 w-full break-all leading-tight">{f.name}</span>
+                            <span className="text-[10px] text-white/30 mt-1 font-mono">{f.size === 0 ? '' : (f.size / 1024).toFixed(1) + ' KB'}</span>
+                        </motion.div>
                     ))}
                 </div>
             </div>
 
             {/* Context Menu */}
             {contextMenu && contextMenu.item && (
-                <div className="ctx-menu glass-panel" style={{ top: contextMenu.y, left: contextMenu.x }}>
-                    <div className="ctx-header">{contextMenu.item.name}</div>
-                    <button onClick={() => openFile(contextMenu.item)}>
-                        {contextMenu.item.isDirectory ? <Folder size={16} /> : <Edit2 size={16} />}
-                        {contextMenu.item.isDirectory ? 'Open' : 'Edit'}
+                <div className="fixed z-[100] liquid-card p-1.5 flex flex-col min-w-[180px] shadow-2xl backdrop-blur-xl border border-white/20" style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 200) }}>
+                    <div className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white/30 border-b border-white/10 mb-1 truncate max-w-[160px]">{contextMenu.item.name}</div>
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-500/20 text-white/80 hover:text-blue-200 transition-colors text-xs font-bold" onClick={() => openFile(contextMenu.item)}>
+                        {contextMenu.item.isDirectory ? <Folder size={14} /> : <Edit2 size={14} />}
+                        {contextMenu.item.isDirectory ? 'Open Folder' : 'Edit File'}
                     </button>
-                    <button onClick={() => handleDownload(contextMenu.item.name)}><ArrowLeft size={16} style={{ transform: 'rotate(-90deg)' }} /> Download</button>
-                    <div className="ctx-div"></div>
-                    <button onClick={() => { setClipboard({ type: 'copy', items: [contextMenu.item.name], sourcePath: path }); setContextMenu(null); }}>
-                        <Copy size={16} /> Copy
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors text-xs font-bold" onClick={() => handleDownload(contextMenu.item.name)}><ArrowLeft size={14} className="-rotate-90" /> Download</button>
+                    <div className="h-px bg-white/10 my-1" />
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors text-xs font-bold" onClick={() => { setClipboard({ type: 'copy', items: [contextMenu.item.name], sourcePath: path }); setContextMenu(null); }}>
+                        <Copy size={14} /> Copy
                     </button>
-                    <button onClick={() => { setClipboard({ type: 'cut', items: [contextMenu.item.name], sourcePath: path }); setContextMenu(null); }}>
-                        <Scissors size={16} /> Cut
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors text-xs font-bold" onClick={() => { setClipboard({ type: 'cut', items: [contextMenu.item.name], sourcePath: path }); setContextMenu(null); }}>
+                        <Scissors size={14} /> Cut
                     </button>
-                    <button onClick={() => { handleRename(contextMenu.item.name); setContextMenu(null); }}>
-                        <Edit2 size={16} /> Rename
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors text-xs font-bold" onClick={() => { handleRename(contextMenu.item.name); setContextMenu(null); }}>
+                        <Edit2 size={14} /> Rename
                     </button>
-                    <button onClick={() => { handleChmod(contextMenu.item.name); setContextMenu(null); }}>
-                        <Shield size={16} /> Permissions
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors text-xs font-bold" onClick={() => { handleChmod(contextMenu.item.name); setContextMenu(null); }}>
+                        <Shield size={14} /> Permissions
                     </button>
-                    <div className="ctx-div"></div>
-                    <button className="ctx-danger" onClick={() => { handleDelete([contextMenu.item.name]); setContextMenu(null); }}>
-                        <Trash2 size={16} /> Delete
+                    <div className="h-px bg-white/10 my-1" />
+                    <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors text-xs font-bold text-left" onClick={() => { handleDelete([contextMenu.item.name]); setContextMenu(null); }}>
+                        <Trash2 size={14} /> <span className="flex-1">Delete</span>
                     </button>
                 </div>
             )}
@@ -389,93 +379,29 @@ const FileManager = () => {
             {/* Editor Modal */}
             <AnimatePresence>
                 {editor && (
-                    <motion.div className="editor-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                        <div className="editor-window glass-panel">
-                            <div className="editor-header">
-                                <div className="eh-left">
-                                    <FileText size={20} className="accent" />
-                                    <span>{editor.path}</span>
-                                    {editor.content !== editor.original && <span className="unsaved-badge">Unsaved</span>}
+                    <motion.div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="liquid-card w-full h-full max-w-6xl flex flex-col overflow-hidden shadow-2xl border border-white/10" initial={{ scale: 0.95 }} animate={{ scale: 1 }}>
+                            <div className="flex items-center justify-between p-4 bg-white/[0.02] border-b border-white/5">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><Code size={20} /></div>
+                                    <span className="font-mono text-sm text-white/70">{editor.path}</span>
+                                    {editor.content !== editor.original && <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold uppercase">Unsaved</span>}
                                 </div>
-                                <div className="eh-right">
-                                    <button id="save-btn" className="glass-button" onClick={saveEditor}>Save Changes</button>
-                                    <button className="close-btn" onClick={() => setEditor(null)}><X size={24} /></button>
+                                <div className="flex items-center gap-3">
+                                    <button id="save-btn" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-blue-600/20" onClick={saveEditor}>Save Changes</button>
+                                    <button className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors" onClick={() => setEditor(null)}><X size={20} /></button>
                                 </div>
                             </div>
                             <textarea
-                                className="editor-content"
+                                className="flex-1 bg-black/30 border-none p-6 text-white font-mono text-sm leading-relaxed outline-none resize-none"
                                 value={editor.content}
                                 onChange={e => setEditor({ ...editor, content: e.target.value })}
                                 spellCheck={false}
                             />
-                        </div>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
-
-            <style jsx>{`
-                .fm-container { display: flex; flex-direction: column; height: 100%; position: relative; }
-                .fm-toolbar { margin: 16px 20px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
-                .left-tools, .right-tools { display: flex; align-items: center; gap: 12px; }
-                
-                .tool-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; }
-                .tool-btn:hover { background: rgba(255,255,255,0.1); color: white; }
-                .tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-                .tool-btn.primary { width: auto; padding: 0 16px; background: var(--accent-gradient); color: white; border: none; gap: 8px; }
-                .tool-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3); }
-                .lbl { font-size: 0.9rem; font-weight: 600; display: none; }
-                @media(min-width: 800px) { .lbl { display: inline; } .tool-btn { width: auto; padding: 0 12px; } }
-
-                .breadcrumbs { display: flex; align-items: center; gap: 6px; overflow-x: auto; max-width: 400px; padding-bottom: 4px; }
-                .crumb { background: none; border: none; color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.9rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: 0.2s; }
-                .crumb:hover { background: rgba(255,255,255,0.1); color: white; }
-                .sep { color: rgba(255,255,255,0.2); }
-
-                .file-grid-wrapper { flex: 1; overflow-y: auto; padding: 0 20px 20px; position: relative; }
-                .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
-                
-                .file-item { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 16px 8px; border-radius: 12px; transition: 0.2s; cursor: pointer; border: 1px solid transparent; }
-                .file-item:hover { background: rgba(255,255,255,0.03); }
-                .file-item.selected { background: rgba(14, 165, 233, 0.1); border-color: rgba(14, 165, 233, 0.3); }
-                
-                .icon-box { margin-bottom: 12px; transition: 0.2s; color: var(--text-secondary); }
-                .file-item:hover .icon-box { transform: scale(1.1); color: white; }
-                .f-icon { width: 42px; height: 42px; stroke-width: 1.5px; }
-                .f-icon.dir { color: #f59e0b; fill: rgba(245, 158, 11, 0.1); }
-                .f-icon.code { color: #8b5cf6; }
-                .f-icon.img { color: #10b981; }
-                .f-icon.zip { color: #e11d48; }
-
-                .file-name { font-size: 0.85rem; font-weight: 500; color: #e2e8f0; word-break: break-word; line-height: 1.3; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-                .file-meta { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; opacity: 0.6; }
-
-                /* Context Menu */
-                .ctx-menu { position: fixed; z-index: 100; min-width: 180px; padding: 6px; display: flex; flex-direction: column; gap: 2px; animation: fadeIn 0.1s ease; }
-                .ctx-menu button { background: transparent; border: none; color: #e2e8f0; text-align: left; padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.1s; width: 100%; }
-                .ctx-menu button:hover { background: rgba(255,255,255,0.1); }
-                .ctx-header { padding: 8px 12px; font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 4px; }
-                .ctx-div { height: 1px; background: rgba(255,255,255,0.1); margin: 4px 0; }
-                .ctx-danger { color: #ff4757 !important; }
-                .ctx-danger:hover { background: rgba(255, 71, 87, 0.1) !important; }
-
-                /* Editor */
-                .editor-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 40px; }
-                .editor-window { width: 100%; height: 100%; max-width: 1200px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.95); }
-                
-                .editor-header { height: 60px; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
-                .eh-left { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); color: var(--text-secondary); }
-                .eh-left .accent { color: var(--accent-primary); }
-                .unsaved-badge { font-size: 0.7rem; background: #e11d48; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-                
-                .eh-right { display: flex; align-items: center; gap: 16px; }
-                .close-btn { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: none; color: white; cursor: pointer; transition: 0.2s; }
-                .close-btn:hover { background: rgba(255, 59, 48, 0.2); color: #ff3b30; transform: rotate(90deg); }
-
-                .editor-content { flex: 1; background: transparent; border: none; padding: 24px; color: #f1f5f9; font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.6; resize: none; outline: none; }
-                
-                .spin { animation: spin 1s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            `}</style>
         </div>
     );
 };

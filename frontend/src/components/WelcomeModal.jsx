@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Terminal, Check, ArrowRight, Monitor, Moon, Sun, HardDrive, Hexagon, ShieldAlert, Rocket } from 'lucide-react';
+import React, { useState } from 'react';
+import { Terminal, Check, ArrowRight, Moon, HardDrive, Hexagon, ShieldAlert, Rocket, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const WelcomeModal = ({ onComplete, initialTheme, setTheme }) => {
     const [step, setStep] = useState(1);
@@ -25,153 +26,167 @@ const WelcomeModal = ({ onComplete, initialTheme, setTheme }) => {
     };
 
     return (
-        <div className="welcome-root">
-            <div className="welcome-glass glass-panel shadow-premium">
-                <div className="modal-progress">
-                    <div className={`p-bar ${step >= 1 ? 'filled' : ''}`}></div>
-                    <div className={`p-bar ${step >= 2 ? 'filled' : ''}`}></div>
-                    <div className={`p-bar ${step >= 3 ? 'filled' : ''}`}></div>
+        <AnimatePresence>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/80 backdrop-blur-3xl"
+            >
+                <div className="relative w-full max-w-[560px] min-h-[580px] flex flex-col liquid-card overflow-hidden shadow-2xl">
+                    {/* Progress Bar */}
+                    <div className="flex justify-center gap-2 p-10 pb-0">
+                        {[1, 2, 3].map((s) => (
+                            <div
+                                key={s}
+                                className={`h-1.5 flex-1 rounded-full transition-all duration-700 ease-[cubic-bezier(0.25,0.8,0.25,1)] relative overflow-hidden ${step >= s ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'bg-white/5'
+                                    }`}
+                            >
+                                {step >= s && (
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent w-full animate-[shimmer_2s_infinite]" />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex-1 flex flex-col p-10 pt-8">
+                        {step === 1 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex-1 flex flex-col items-center justify-center text-center gap-8"
+                            >
+                                <div className="relative">
+                                    <div className="absolute inset-0 bg-blue-500/30 blur-[60px] rounded-full" />
+                                    <div className="relative w-28 h-28 rounded-[2rem] bg-gradient-to-br from-blue-600 to-cyan-400 flex items-center justify-center text-white shadow-2xl shadow-blue-500/20 z-10">
+                                        <Hexagon size={64} className="absolute text-black/10" strokeWidth={1} />
+                                        <Terminal size={36} className="relative z-10" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h1 className="text-5xl font-black text-white tracking-[0.2em] mb-4 drop-shadow-2xl">SMM</h1>
+                                    <p className="text-lg font-medium text-white/60 max-w-[300px] mx-auto leading-relaxed">Secure SSH Console for your ultra-modern Minecraft Infrastructure.</p>
+                                </div>
+
+                                <button
+                                    className="w-full h-16 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold text-lg uppercase tracking-widest flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+                                    onClick={handleNext}
+                                >
+                                    Initiate Sequence <Rocket size={20} className="group-hover:translate-x-1 duration-300 transform -rotate-45" />
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {step === 2 && (
+                            <motion.div
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex-1 flex flex-col items-center"
+                            >
+                                <div className="text-center mb-10">
+                                    <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2">Aesthetic Mode</h2>
+                                    <p className="text-white/50 font-medium">Define the visual properties of your workspace.</p>
+                                </div>
+
+                                <div className="flex gap-6 mb-12 w-full justify-center">
+                                    {[
+                                        { id: 'glass', label: 'Liquid Glass', icon: <Sparkles size={20} />, bg: 'bg-gradient-to-br from-blue-500 to-cyan-400' },
+                                        { id: 'obsidian', label: 'Obsidian', icon: <Moon size={20} />, bg: 'bg-gray-900 border border-white/10' },
+                                        { id: 'coder', label: 'Matrix', icon: <Terminal size={20} />, bg: 'bg-black border border-green-500/50 text-green-400' }
+                                    ].map((theme) => (
+                                        <div
+                                            key={theme.id}
+                                            className={`relative w-28 h-28 rounded-3xl cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 bg-white/5 border border-white/5 hover:-translate-y-2 hover:bg-white/10 ${localTheme === theme.id ? 'ring-2 ring-offset-2 ring-offset-black ring-blue-500 shadow-xl shadow-blue-500/10' : ''
+                                                }`}
+                                            onClick={() => handleThemeChange(theme.id)}
+                                        >
+                                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${theme.bg}`}>
+                                                {theme.icon}
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-white/70">{theme.label}</span>
+                                            {localTheme === theme.id && <div className="absolute top-2 right-2 text-blue-400"><Check size={14} strokeWidth={4} /></div>}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button
+                                    className="w-full h-14 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-sm uppercase tracking-widest transition-all hover:scale-[1.01] mt-auto"
+                                    onClick={handleNext}
+                                >
+                                    Proceed to Host Configuration
+                                </button>
+                            </motion.div>
+                        )}
+
+                        {step === 3 && (
+                            <motion.div
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex-1 flex flex-col"
+                            >
+                                <div className="text-center mb-10">
+                                    <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2">Link Established</h2>
+                                    <p className="text-white/50 font-medium">Awaiting SSH credentials to bridge the connection.</p>
+                                </div>
+
+                                <div className="flex flex-col gap-4 mb-8">
+                                    <div className="flex gap-4">
+                                        <input
+                                            className="liquid-input flex-1 h-12 px-4 rounded-xl bg-black/20 font-mono text-sm"
+                                            placeholder="Host Address"
+                                            value={credentials.host}
+                                            onChange={e => setCredentials({ ...credentials, host: e.target.value })}
+                                        />
+                                        <input
+                                            className="liquid-input w-24 h-12 px-4 rounded-xl bg-black/20 font-mono text-sm"
+                                            type="number"
+                                            placeholder="22"
+                                            value={credentials.port}
+                                            onChange={e => setCredentials({ ...credentials, port: parseInt(e.target.value) })}
+                                        />
+                                    </div>
+                                    <input
+                                        className="liquid-input h-12 px-4 rounded-xl bg-black/20 font-mono text-sm"
+                                        placeholder="Username"
+                                        value={credentials.username}
+                                        onChange={e => setCredentials({ ...credentials, username: e.target.value })}
+                                    />
+                                    <input
+                                        className="liquid-input h-12 px-4 rounded-xl bg-black/20 font-mono text-sm"
+                                        type="password"
+                                        placeholder="Password / Key"
+                                        value={credentials.password}
+                                        onChange={e => setCredentials({ ...credentials, password: e.target.value })}
+                                    />
+
+                                    <div className="flex items-center gap-3 px-4 h-12 rounded-xl bg-white/5 border border-white/5">
+                                        <HardDrive size={16} className="text-white/30" />
+                                        <input
+                                            className="flex-1 bg-transparent border-none outline-none text-white font-mono text-sm placeholder:text-white/20"
+                                            placeholder="Root Path (e.g. /opt/minecraft)"
+                                            value={credentials.path}
+                                            onChange={e => setCredentials({ ...credentials, path: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 justify-center text-[10px] font-bold uppercase tracking-widest text-emerald-400 opacity-60 mb-8">
+                                    <ShieldAlert size={12} />
+                                    <span>Credentials are encrypted & stored locally</span>
+                                </div>
+
+                                <button
+                                    className="w-full h-16 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 text-white font-black text-sm uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    onClick={handleFinish}
+                                >
+                                    Establish Full Bridge
+                                </button>
+                            </motion.div>
+                        )}
+                    </div>
                 </div>
-
-                <div className="modal-body">
-                    {step === 1 && (
-                        <div className="modal-step fade-in">
-                            <div className="logo-burst">
-                                <div className="logo-core">
-                                    <Hexagon size={48} fill="currentColor" opacity={0.2} />
-                                    <div className="core-icon"><Terminal size={24} /></div>
-                                </div>
-                            </div>
-                            <h1 className="hero-text">SMM</h1>
-                            <p className="hero-sub">Secure SSH Console for your Minecraft Infrastructure.</p>
-                            <button className="glass-button launch-btn" onClick={handleNext}>
-                                Initiate Sequence <Rocket size={18} />
-                            </button>
-                        </div>
-                    )}
-
-                    {step === 2 && (
-                        <div className="modal-step fade-in">
-                            <h2 className="step-title">Select Aesthetic Mode</h2>
-                            <p className="step-sub">Define the visual properties of your workspace.</p>
-
-                            <div className="aesthetic-options">
-                                <div className={`aesthetic-card glass-panel ${localTheme === 'glass' ? 'active' : ''}`} onClick={() => handleThemeChange('glass')}>
-                                    <div className="a-preview glass-a" />
-                                    <span className="a-label">Liquid Glass</span>
-                                    {localTheme === 'glass' && <div className="a-check"><Check size={12} /></div>}
-                                </div>
-
-                                <div className={`aesthetic-card glass-panel ${localTheme === 'dark' ? 'active' : ''}`} onClick={() => handleThemeChange('dark')}>
-                                    <div className="a-preview dark-a"><Moon size={18} /></div>
-                                    <span className="a-label">Obsidian Dark</span>
-                                    {localTheme === 'dark' && <div className="a-check"><Check size={12} /></div>}
-                                </div>
-
-                                <div className={`aesthetic-card glass-panel ${localTheme === 'coder' ? 'active' : ''}`} onClick={() => handleThemeChange('coder')}>
-                                    <div className="a-preview coder-a"><Terminal size={18} /></div>
-                                    <span className="a-label">Matrix Code</span>
-                                    {localTheme === 'coder' && <div className="a-check"><Check size={12} /></div>}
-                                </div>
-                            </div>
-
-                            <button className="glass-panel next-util-btn" onClick={handleNext}>
-                                Proceed to Host Configuration
-                            </button>
-                        </div>
-                    )}
-
-                    {step === 3 && (
-                        <div className="modal-step fade-in">
-                            <h2 className="step-title">Link Established</h2>
-                            <p className="step-sub">Awaiting SSH credentials to bridge the connection.</p>
-
-                            <div className="auth-form">
-                                <div className="auth-row">
-                                    <input className="glass-input" placeholder="Secure Host Address" value={credentials.host} onChange={e => setCredentials({ ...credentials, host: e.target.value })} />
-                                    <input className="glass-input port" type="number" placeholder="22" value={credentials.port} onChange={e => setCredentials({ ...credentials, port: parseInt(e.target.value) })} />
-                                </div>
-                                <input className="glass-input full" placeholder="Identity (Username)" value={credentials.username} onChange={e => setCredentials({ ...credentials, username: e.target.value })} />
-                                <input className="glass-input full" type="password" placeholder="Key (Password)" value={credentials.password} onChange={e => setCredentials({ ...credentials, password: e.target.value })} />
-
-                                <div className="path-box glass-panel">
-                                    <HardDrive size={18} opacity={0.4} />
-                                    <input className="clean-input" placeholder="Root Path (e.g. /opt/minecraft)" value={credentials.path} onChange={e => setCredentials({ ...credentials, path: e.target.value })} />
-                                </div>
-                            </div>
-
-                            <div className="security-notice">
-                                <ShieldAlert size={14} />
-                                <span>Credentials are stored locally and encrypted in transit.</span>
-                            </div>
-
-                            <button className="glass-button finish-btn" onClick={handleFinish}>
-                                Establish Full Bridge
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <style jsx>{`
-                .welcome-root { position: fixed; inset: 0; z-index: 5000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(40px); animation: modal-fade 0.6s var(--ease-liquid); }
-                @keyframes modal-fade { from { opacity: 0; } }
-                
-                .welcome-glass { width: 560px; min-height: 520px; display: flex; flex-direction: column; background: rgba(0,0,0,0.4); overflow: hidden; }
-                
-                .modal-progress { display: flex; height: 3px; gap: 4px; padding: 0 40px; margin-top: 40px; }
-                .p-bar { flex: 1; background: rgba(255,255,255,0.05); border-radius: 10px; transition: 0.6s var(--ease-liquid); position: relative; overflow: hidden; }
-                .p-bar.filled { background: var(--accent-primary); box-shadow: 0 0 10px var(--accent-primary); }
-                .p-bar.filled::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: progress-shine 2s infinite; }
-                @keyframes progress-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-
-                .modal-body { flex: 1; display: flex; flex-direction: column; padding: 40px; }
-                .modal-step { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; }
-                
-                .logo-burst { margin-bottom: 40px; position: relative; }
-                .logo-core { width: 100px; height: 100px; background: var(--accent-gradient); border-radius: 30px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-                .core-icon { position: absolute; }
-                .logo-burst::after { content: ''; position: absolute; inset: -20px; border-radius: 50%; background: var(--accent-primary); filter: blur(40px); opacity: 0.2; z-index: 1; }
-
-                .hero-text { font-size: 2.4rem; font-weight: 950; letter-spacing: 8px; margin: 0; color: white; text-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-                .hero-sub { color: var(--text-secondary); opacity: 0.6; margin: 16px 0 48px; font-weight: 600; font-size: 1rem; max-width: 340px; line-height: 1.6; }
-                .launch-btn { height: 56px; padding: 0 40px; font-size: 1.1rem; box-shadow: 0 20px 40px rgba(0,122,255,0.2); }
-
-                .step-title { font-size: 1.6rem; font-weight: 900; color: white; margin: 0; }
-                .step-sub { color: var(--text-secondary); opacity: 0.5; margin: 8px 0 40px; font-weight: 700; font-size: 0.9rem; }
-
-                .aesthetic-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; margin-bottom: 40px; }
-                .aesthetic-card { padding: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; position: relative; transition: 0.3s; background: rgba(255,255,255,0.02); aspect-ratio: 1/1; border-radius: 50%; }
-                .aesthetic-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.05); }
-                .aesthetic-card.active { border-color: var(--accent-primary); background: rgba(var(--accent-primary-rgb), 0.1); border: 2px solid var(--accent-primary); }
-                
-                .a-preview { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-                .glass-a { background: var(--accent-gradient); }
-                .dark-a { background: #0c0c0e; border: 1px solid rgba(255,255,255,0.1); color: #555; }
-                .coder-a { background: #000; border: 1px solid #0f0; color: #0f0; }
-                
-                .a-label { font-size: 0.75rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-                .a-check { position: absolute; top: 0; right: 0; background: var(--accent-primary); color: white; border-radius: 50%; padding: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
-
-                .next-util-btn { width: 100%; height: 50px; border: none; cursor: pointer; font-weight: 800; color: white; margin-top: auto; }
-
-                /* AUTH FORM */
-                .auth-form { width: 100%; display: flex; flex-direction: column; gap: 12px; }
-                .auth-row { display: flex; gap: 12px; }
-                .auth-row .glass-input { flex: 1; }
-                .auth-row .port { width: 100px; flex: none; }
-                .full { width: 100%; }
-                
-                .path-box { padding: 0 16px; height: 50px; display: flex; align-items: center; gap: 16px; background: rgba(0,0,0,0.2); }
-                .clean-input { flex: 1; background: transparent; border: none; outline: none; color: white; font-family: var(--font-mono); font-size: 0.9rem; }
-
-                .security-notice { display: flex; align-items: center; gap: 10px; font-size: 0.7rem; color: #34c759; opacity: 0.5; font-weight: 800; margin: 24px 0 40px; }
-                .finish-btn { width: 100%; height: 56px; margin-top: auto; box-shadow: 0 15px 30px rgba(0,122,255,0.15); }
-
-                .fade-in { animation: step-in 0.5s var(--ease-liquid); }
-                @keyframes step-in { from { opacity: 0; transform: translateY(10px); } }
-            `}</style>
-        </div>
+            </motion.div>
+        </AnimatePresence>
     );
 };
 
