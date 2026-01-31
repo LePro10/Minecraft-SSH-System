@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import { ServerProvider, useServer } from './context/ServerContext';
 import { ToastProvider } from './context/ToastContext';
 import ToastContainer from './components/ToastContainer';
 import { Activity, Folder, Users, Settings as SettingsIcon, Terminal, Package, Sliders, Hexagon, ShieldCheck } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import FileManager from './components/FileManager';
 import PlayerManager from './components/PlayerManager';
@@ -12,7 +12,6 @@ import PluginManager from './components/PluginManager';
 import ServerProperties from './components/ServerProperties';
 import Settings from './components/Settings';
 import WelcomeModal from './components/WelcomeModal';
-import './styles/main.css';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -27,11 +26,47 @@ class ErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) {
-      return <div style={{ padding: '40px', color: 'white' }}>Something went wrong. Check console.</div>;
+      return <div className="p-10 text-white">Something went wrong. Check console.</div>;
     }
     return this.props.children;
   }
 }
+
+// Magnetic Button Component
+const MagneticButton = ({ children, className, onClick, active }) => {
+  const ref = useRef(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
+  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
+
+  const handleMouseMove = (e) => {
+    const { left, top, width, height } = ref.current.getBoundingClientRect();
+    const centerX = left + width / 2;
+    const centerY = top + height / 2;
+    x.set(e.clientX - centerX);
+    y.set(e.clientY - centerY);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.button
+      ref={ref}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+      style={{ x: mouseXSpring, y: mouseYSpring }}
+      className={`relative group ${className}`}
+    >
+      {children}
+    </motion.button>
+  );
+};
 
 function AppContent() {
   const { connectSSH, updateConfig, isConnected, isConnecting } = useServer();
@@ -45,7 +80,6 @@ function AppContent() {
     const visited = localStorage.getItem('hasVisited');
     if (!visited) setShowWelcome(true);
 
-    // Load theme radius
     const savedRadius = localStorage.getItem('theme_radius') || 'soft';
     document.documentElement.setAttribute('data-radius', savedRadius);
 
@@ -67,8 +101,27 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('mc_theme', theme);
+    const applyTheme = () => {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('mc_theme', theme);
+
+      const root = document.documentElement;
+      root.style.removeProperty('--bg-app');
+      root.style.removeProperty('--bg-panel');
+      root.style.removeProperty('--text-primary');
+      root.style.removeProperty('--accent-primary');
+      root.style.removeProperty('--accent-gradient');
+      root.style.removeProperty('--glass-blur');
+      root.style.removeProperty('--glass-border');
+      root.style.removeProperty('--blob-color-1');
+      root.style.removeProperty('--blob-color-2');
+    };
+
+    applyTheme();
+
+
+
+
   }, [theme]);
 
   const handleWelcomeComplete = (creds) => {
@@ -111,6 +164,15 @@ function AppContent() {
 
   return (
     <>
+      <div className="fixed inset-0 z-[-1] overflow-hidden bg-black selection:bg-cyan-500/30">
+        {/* Dynamic Gradients / Light Blobs */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full mix-blend-screen animate-pulse-slow" style={{ backgroundColor: 'var(--blob-color-1)', filter: 'blur(120px)' }} />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full mix-blend-screen animate-pulse-slow" style={{ backgroundColor: 'var(--blob-color-2)', animationDelay: '2s', filter: 'blur(150px)' }} />
+
+        {/* Grain/Noise Overlay */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
+      </div>
+
       {showWelcome && (
         <WelcomeModal
           onComplete={handleWelcomeComplete}
@@ -119,108 +181,89 @@ function AppContent() {
         />
       )}
 
-      <div className={`app-container ${showWelcome ? 'blurred' : ''}`}>
-        {/* Navigation Sidebar */}
-        <aside className="glass-panel main-sidebar">
-          <div className="brand-header">
-            <div className="brand-logo">
-              <Hexagon size={24} color="white" fill="currentColor" opacity={0.2} />
-              <div className="logo-inner">
-                <Terminal size={18} color="white" />
+      <div className={`flex h-screen w-screen gap-6 p-6 overflow-hidden transition-all duration-700 ease-liquid ${showWelcome ? 'blur-2xl scale-95 opacity-50 pointer-events-none' : ''}`}>
+
+        {/* Sidebar */}
+        <motion.aside
+          initial={{ x: -50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="liquid-card w-[280px] h-full flex flex-col p-6 z-50 rounded-3xl"
+        >
+          {/* Brand */}
+          <div className="flex items-center gap-4 mb-10 px-2">
+            <div className="relative w-12 h-12 flex items-center justify-center">
+              <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
+              <div className="relative z-10 w-full h-full bg-gradient-to-br from-blue-400 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Terminal size={20} className="text-white" />
               </div>
-              <div className={`connection-ring ${isConnected ? 'online' : isConnecting ? 'pending' : 'offline'}`} />
+
+              {/* Status Indicator */}
+              <div className={`absolute -inset-1 border-2 rounded-2xl transition-all duration-500 ${isConnected ? 'border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.3)]' :
+                isConnecting ? 'border-yellow-400/50' : 'border-red-500/30'
+                }`} />
             </div>
-            <div className="brand-text">
-              <h1>SMM</h1>
-              <p>v2.5 {isConnected ? 'Link Active' : 'Standby'}</p>
+            <div>
+              <h1 className="text-lg font-bold tracking-widest text-white">SMM</h1>
+              <span className={`text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full border ${isConnected ? 'text-green-400 border-green-500/20 bg-green-500/10' :
+                isConnecting ? 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10' : 'text-red-400 border-red-500/20 bg-red-500/10'
+                }`}>
+                {isConnected ? 'Link Active' : 'Standby'}
+              </span>
             </div>
           </div>
 
-          <nav className="sidebar-nav">
+          {/* Navigation */}
+          <nav className="flex-1 flex flex-col gap-2">
             {tabs.map((tab) => (
-              <button
+              <MagneticButton
                 key={tab.id}
-                className={`sidebar-link ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => handleTabChange(tab.id)}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-300 ${activeTab === tab.id
+                  ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-md'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
               >
-                <div className="link-content">
-                  <tab.icon size={20} className="link-icon" />
-                  <span>{tab.label}</span>
-                </div>
+                <tab.icon size={20} className={`transition-transform duration-300 ${activeTab === tab.id ? 'scale-110 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : ''}`} />
+                <span className="font-medium tracking-wide text-sm">{tab.label}</span>
+
                 {activeTab === tab.id && (
                   <motion.div
-                    layoutId="sidebarActive"
-                    className="active-indicator"
-                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    layoutId="activeTabGlow"
+                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/10 to-transparent pointer-events-none"
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
                 )}
-              </button>
+              </MagneticButton>
             ))}
           </nav>
 
-          <div className="sidebar-footer">
-            <div className="security-status glass-panel">
-              <ShieldCheck size={16} />
-              <span>Encrypted Link</span>
+          {/* Footer */}
+          <div className="pt-6 border-t border-white/5 mt-auto">
+            <div className="flex items-center gap-3 px-4 py-3 bg-green-500/5 border border-green-500/10 rounded-xl text-xs font-bold text-green-400 tracking-wider">
+              <ShieldCheck size={14} />
+              <span>ENCRYPTED V2 Link</span>
             </div>
           </div>
-        </aside>
+        </motion.aside>
 
-        {/* Main View Area */}
-        <main className="view-viewport">
+        {/* Main Content Area */}
+        <main className="flex-1 h-full min-w-0 relative z-10 perspective-1000">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, scale: 0.99, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 1.01, y: -10 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="view-wrapper"
+              initial={{ opacity: 0, y: 20, rotateX: -2, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, rotateX: 2, scale: 0.98, filter: 'blur(10px)' }}
+              transition={{ duration: 0.5, ease: [0.25, 0.8, 0.25, 1] }}
+              className="w-full h-full"
             >
               {renderContent()}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
-
-      <style jsx>{`
-        .app-container { display: flex; height: 100vh; width: 100vw; transition: 0.6s var(--ease-liquid); gap: 24px; padding: 24px; background: #000; overflow: hidden; }
-        .app-container.blurred { filter: blur(30px) brightness(0.6); pointer-events: none; }
-        
-        /* SIDEBAR PREMIUM */
-        .main-sidebar { width: 300px; height: 100%; display: flex; flex-direction: column; padding: 40px 24px; z-index: 100; flex-shrink: 0; }
-        
-        .brand-header { display: flex; align-items: center; gap: 20px; margin-bottom: 60px; padding-left: 8px; }
-        .brand-logo { position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
-        .logo-inner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-gradient); border-radius: 14px; box-shadow: var(--shadow-glow); }
-        
-        .connection-ring { position: absolute; inset: -4px; border-radius: 18px; border: 2px solid transparent; }
-        .connection-ring.online { border-color: #34c759; box-shadow: 0 0 15px rgba(52,199,89,0.3); animation: ringPulse 2s infinite; }
-        .connection-ring.pending { border-color: #ffd60a; animation: ringPulse 1.5s infinite; }
-        .connection-ring.offline { border-color: #ff3b30; }
-        @keyframes ringPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
-
-        .brand-text h1 { margin: 0; font-size: 1.1rem; font-weight: 950; letter-spacing: 2px; color: white; line-height: 1; }
-        .brand-text p { margin: 4px 0 0; font-size: 0.65rem; font-weight: 800; color: var(--text-secondary); opacity: 0.4; text-transform: uppercase; letter-spacing: 1px; }
-
-        .sidebar-nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-        .sidebar-link { position: relative; padding: 18px 24px; border: none; background: transparent; color: var(--text-secondary); border-radius: 18px; font-weight: 800; font-size: 0.95rem; cursor: pointer; transition: 0.3s var(--ease-liquid); text-align: left; opacity: 0.6; }
-        .sidebar-link:hover { opacity: 1; background: rgba(255,255,255,0.03); transform: translateX(8px); }
-        .sidebar-link.active { opacity: 1; color: white; }
-        
-        .link-content { position: relative; z-index: 5; display: flex; align-items: center; gap: 18px; }
-        .link-icon { transition: transform 0.3s; }
-        .sidebar-link.active .link-icon { transform: scale(1.1); color: var(--accent-primary); }
-        
-        .active-indicator { position: absolute; inset: 0; background: rgba(255,255,255,0.03); border-radius: 18px; border: 1px solid rgba(255,255,255,0.08); z-index: 1; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); }
-        .sidebar-link.active::before { content: ''; position: absolute; left: 0; top: 18px; bottom: 18px; width: 4px; border-radius: 0 4px 4px 0; background: var(--accent-primary); box-shadow: 0 0 15px var(--accent-primary); z-index: 10; }
-
-        .sidebar-footer { padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); }
-        .security-status { display: flex; align-items: center; gap: 12px; padding: 16px; font-size: 0.75rem; font-weight: 800; color: #34c759; background: rgba(52,199,89,0.05); }
-
-        .view-viewport { flex: 1; height: 100%; position: relative; min-width: 0; }
-        .view-wrapper { height: 100%; width: 100%; }
-      `}</style>
     </>
   );
 }

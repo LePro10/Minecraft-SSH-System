@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useServer } from '../context/ServerContext';
-import { Save, RefreshCw, Info, Settings, Search, Loader2, AlertCircle, Shield, Globe, Zap, Cpu, Sliders } from 'lucide-react';
+import { Save, RefreshCw, Info, Settings, Search, Loader2, AlertCircle, Shield, Globe, Zap, Cpu, Sliders, Check } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ServerProperties = ({ setDirty }) => {
     const { config, isConnected } = useServer();
@@ -125,34 +126,36 @@ const ServerProperties = ({ setDirty }) => {
         if (filter && !key.toLowerCase().includes(filter.toLowerCase())) return null;
 
         return (
-            <div key={key} className={`prop-row ${errors[key] ? 'has-error' : ''}`}>
-                <div className="prop-name-group">
-                    <span className="prop-name">{key.replace(/-/g, ' ')}</span>
-                    <div className="prop-info-trigger">
-                        <Info size={14} className="info-icon" />
-                        <div className="prop-tooltip">{meta.desc}</div>
+            <div key={key} className={`flex items-center justify-between p-3 rounded-xl transition-colors ${errors[key] ? 'bg-red-500/10 border border-red-500/30' : 'bg-white/[0.03] hover:bg-white/[0.06]'}`}>
+                <div className="flex items-center gap-3">
+                    <span className="font-bold text-sm text-white capitalize">{key.replace(/-/g, ' ')}</span>
+                    <div className="group relative">
+                        <Info size={14} className="text-white/30 hover:text-white/60 cursor-help transition-colors" />
+                        <div className="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 w-64 p-3 rounded-xl bg-black/90 backdrop-blur-xl border border-white/10 text-xs text-white/80 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-2xl">
+                            {meta.desc}
+                        </div>
                     </div>
                 </div>
 
-                <div className="prop-control">
+                <div>
                     {meta.type === 'boolean' || value === 'true' || value === 'false' ? (
                         <button
-                            className={`prop-toggle ${value === 'true' ? 'on' : 'off'}`}
+                            className={`w-11 h-6 rounded-full relative transition-all duration-300 ${value === 'true' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 'bg-white/10'}`}
                             onClick={() => updateProp(key, value === 'true' ? 'false' : 'true')}
                         >
-                            <div className="knob" />
+                            <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all duration-300 ${value === 'true' ? 'left-6' : 'left-1'}`} />
                         </button>
                     ) : meta.type === 'enum' ? (
                         <select
-                            className="glass-input prop-select"
+                            className="liquid-input py-1 px-3 text-sm h-8"
                             value={value}
                             onChange={e => updateProp(key, e.target.value)}
                         >
-                            {meta.options.map(opt => <option key={opt} value={opt}>{opt.replace('minecraft:', '')}</option>)}
+                            {meta.options.map(opt => <option key={opt} value={opt} className="bg-gray-900">{opt.replace('minecraft:', '')}</option>)}
                         </select>
                     ) : (
                         <input
-                            className="glass-input prop-input"
+                            className={`liquid-input py-1 px-3 text-sm h-8 w-40 font-mono text-right ${errors[key] ? 'border-red-500/50 text-red-200' : ''}`}
                             type={meta.type === 'number' ? 'number' : 'text'}
                             value={value}
                             onChange={e => updateProp(key, e.target.value)}
@@ -164,140 +167,118 @@ const ServerProperties = ({ setDirty }) => {
     };
 
     return (
-        <div className="properties-container">
-            <header className="properties-header glass-panel">
-                <div className="header-main">
-                    <div className="header-icon-box">
-                        <Sliders size={24} />
+        <div className="flex flex-col h-full overflow-hidden p-3 gap-6">
+            <header className="liquid-card p-6 flex flex-wrap items-center justify-between gap-6 shrink-0 relative z-10">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center text-white">
+                        <Sliders size={28} />
                     </div>
-                    <div className="header-text">
-                        <h2>Engine Properties</h2>
-                        <span className="file-badge">server.properties</span>
+                    <div>
+                        <h2 className="text-2xl font-black text-white tracking-tight">Engine Properties</h2>
+                        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400 mt-1 font-mono bg-emerald-500/10 px-2 py-0.5 rounded w-fit">server.properties</span>
                     </div>
                 </div>
 
-                <div className="header-actions">
-                    <div className="search-box glass-panel">
-                        <Search size={16} />
-                        <input placeholder="Search properties..." value={filter} onChange={e => setFilter(e.target.value)} />
+                <div className="flex items-center gap-4 flex-wrap">
+                    <div className="relative group">
+                        <div className="absolute inset-y-0 left-4 flex items-center text-white/30 group-focus-within:text-emerald-400 transition-colors">
+                            <Search size={18} />
+                        </div>
+                        <input
+                            className="w-[260px] h-12 pl-12 pr-4 rounded-xl bg-black/20 border border-white/10 focus:border-emerald-500/50 focus:bg-black/40 outline-none text-white text-sm font-medium transition-all placeholder:text-white/20"
+                            placeholder="Search properties..."
+                            value={filter}
+                            onChange={e => setFilter(e.target.value)}
+                        />
                     </div>
-                    <button className="glass-button refresh-btn" onClick={fetchProperties}>
-                        <RefreshCw className={loading ? 'spin' : ''} size={18} />
+
+                    <button className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all" onClick={fetchProperties}>
+                        <RefreshCw className={loading ? 'animate-spin' : ''} size={20} />
                     </button>
-                    <button className="glass-button save-btn" onClick={handleSave} disabled={saving}>
-                        {saving ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
-                        Save Changes
+
+                    <button
+                        className={`h-12 px-6 rounded-xl font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg ${isDirty
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/20 scale-105'
+                                : 'bg-white/5 border border-white/10 text-white/40 cursor-not-allowed'
+                            }`}
+                        onClick={handleSave}
+                        disabled={saving || !isDirty}
+                    >
+                        {saving ? <Loader2 className="animate-spin" size={18} /> : (isDirty ? <Save size={18} /> : <Check size={18} />)}
+                        {saving ? 'Saving...' : (isDirty ? 'Save Changes' : 'Synced')}
                     </button>
                 </div>
             </header>
 
-            {error ? (
-                <div className="error-state glass-panel">
-                    <AlertCircle size={48} className="err-color" />
-                    <h3>Configuration Error</h3>
-                    <p>{error}</p>
-                    <button onClick={fetchProperties} className="glass-button">Retry Connection</button>
-                </div>
-            ) : Object.keys(properties).length === 0 && !loading ? (
-                <div className="error-state glass-panel">
-                    <Info size={48} />
-                    <h3>Properties Empty</h3>
-                    <p>No configuration properties found at the specified path.</p>
-                </div>
-            ) : (
-                <div className="properties-scroll">
-                    <div className="properties-grid">
+            <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin scrollbar-thumb-white/10 flex flex-col gap-6">
+                {error ? (
+                    <div className="liquid-card p-12 text-center max-w-lg mx-auto flex flex-col items-center gap-6 border-red-500/30">
+                        <AlertCircle size={48} className="text-red-400 drop-shadow-[0_0_15px_rgba(248,113,113,0.5)]" />
+                        <div>
+                            <h3 className="text-xl font-bold text-white mb-2">Configuration Error</h3>
+                            <p className="text-white/50">{error}</p>
+                        </div>
+                        <button onClick={fetchProperties} className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-sm text-white transition-all">Retry Connection</button>
+                    </div>
+                ) : Object.keys(properties).length === 0 && !loading ? (
+                    <div className="liquid-card p-12 text-center max-w-lg mx-auto flex flex-col items-center gap-6">
+                        <Info size={48} className="text-blue-400" />
+                        <div>
+                            <h3 className="text-xl font-bold text-white mb-2">Properties Empty</h3>
+                            <p className="text-white/50">No configuration properties found at the specified path.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 pb-8">
                         {sections.map(section => {
                             const visibleKeys = section.keys.filter(k => properties[k] !== undefined);
                             if (visibleKeys.length === 0 && !filter) return null;
 
                             return (
-                                <section key={section.title} className="glass-panel prop-section">
-                                    <div className="section-title">
-                                        <div className="section-icon">{section.icon}</div>
-                                        <h3>{section.title}</h3>
+                                <motion.section
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    key={section.title}
+                                    className="liquid-card p-0 overflow-hidden flex flex-col"
+                                >
+                                    <div className="p-5 border-b border-white/5 flex items-center gap-3 bg-white/[0.02]">
+                                        <div className="text-emerald-400">{section.icon}</div>
+                                        <h3 className="font-bold text-sm uppercase tracking-widest text-white/80">{section.title}</h3>
                                     </div>
-                                    <div className="section-content">
+                                    <div className="p-4 flex flex-col gap-1">
                                         {visibleKeys.map(renderInput)}
                                     </div>
-                                </section>
+                                </motion.section>
                             );
                         })}
 
                         {advancedKeys.length > 0 && (
-                            <section className="glass-panel prop-section advanced">
-                                <div className="section-title">
-                                    <div className="section-icon"><Cpu size={18} /></div>
-                                    <h3>Advanced & Technical</h3>
+                            <motion.section
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="liquid-card p-0 overflow-hidden col-span-1 xl:col-span-3"
+                            >
+                                <div className="p-5 border-b border-white/5 flex items-center gap-3 bg-white/[0.02]">
+                                    <div className="text-purple-400"><Cpu size={18} /></div>
+                                    <h3 className="font-bold text-sm uppercase tracking-widest text-white/80">Advanced & Technical Settings</h3>
                                 </div>
-                                <div className="section-content advanced-grid">
+                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1">
                                     {advancedKeys.map(renderInput)}
                                 </div>
-                            </section>
+                            </motion.section>
                         )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {loading && (
-                <div className="loading-overlay">
-                    <Loader2 className="spin" size={48} />
-                    <p>Accessing Engine Records...</p>
-                </div>
-            )}
-
-            <style jsx>{`
-                .properties-container { height: 100%; display: flex; flex-direction: column; gap: 32px; overflow: hidden; padding: 10px; }
-                .properties-header { padding: 24px 40px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); }
-                .header-main { display: flex; align-items: center; gap: 20px; }
-                .header-icon-box { background: var(--accent-gradient); color: white; padding: 12px; border-radius: 16px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
-                .header-text h2 { margin: 0; font-size: 1.4rem; font-weight: 800; letter-spacing: -1px; }
-                .file-badge { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-primary); background: rgba(var(--accent-primary), 0.1); padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
-                
-                .header-actions { display: flex; gap: 15px; }
-                .search-box { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 50px; width: 300px; background: rgba(0,0,0,0.2); }
-                .search-box input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 0.95rem; }
-                
-                .properties-scroll { flex: 1; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; }
-                .properties-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; padding-bottom: 40px; }
-                @media (max-width: 1400px) { .properties-grid { grid-template-columns: 1fr 1fr; } }
-                @media (max-width: 900px) { .properties-grid { grid-template-columns: 1fr; } }
-                
-                .prop-section { padding: 28px; }
-                .section-title { display: flex; align-items: center; gap: 15px; border-bottom: 2px solid rgba(255,255,255,0.03); padding-bottom: 15px; margin-bottom: 20px; }
-                .section-icon { color: var(--accent-primary); }
-                .section-title h3 { margin: 0; font-size: 0.85rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; }
-
-                .prop-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-radius: 12px; transition: 0.2s; background: rgba(255,255,255,0.015); margin-bottom: 8px; }
-                .prop-row:hover { background: rgba(255,255,255,0.04); }
-                
-                .prop-name-group { display: flex; align-items: center; gap: 12px; }
-                .prop-name { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); text-transform: capitalize; }
-                .prop-info-trigger { position: relative; color: var(--text-secondary); opacity: 0.4; cursor: help; }
-                .prop-tooltip { visibility: hidden; opacity: 0; position: absolute; left: 50%; bottom: 150%; transform: translateX(-50%); width: 260px; background: rgba(0,0,0,0.9); border: 1px solid var(--glass-border); padding: 15px; border-radius: 12px; font-size: 0.8rem; line-height: 1.5; color: white; z-index: 100; transition: 0.3s; pointer-events: none; backdrop-filter: blur(10px); }
-                .prop-info-trigger:hover .prop-tooltip { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(-10px); }
-
-                .prop-toggle { width: 44px; height: 24px; border-radius: 50px; border: none; padding: 3px; cursor: pointer; position: relative; transition: 0.4s; }
-                .prop-toggle.on { background: #34c759; box-shadow: 0 0 15px rgba(52, 199, 89, 0.3); }
-                .prop-toggle.off { background: rgba(255,255,255,0.1); }
-                .knob { width: 18px; height: 18px; background: white; border-radius: 50%; transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-                .prop-toggle.on .knob { transform: translateX(20px); }
-                
-                .prop-select, .prop-input { min-width: 140px; padding: 8px 12px; font-size: 0.85rem; text-align: right; }
-                .advanced { grid-column: 1 / -1; margin-top: 10px; }
-                .advanced-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
-                @media (max-width: 1100px) { .advanced-grid { grid-template-columns: 1fr; } }
-
-                .error-state { margin: 60px auto; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 60px; max-width: 500px; text-align: center; }
-                .err-color { color: #ff3b30; }
-                
-                .loading-overlay { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0.5; gap: 20px; }
-                .spin { animation: spin 1s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            `}</style>
+                {loading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-50">
+                        <Loader2 className="animate-spin text-emerald-400 mb-4" size={48} />
+                        <p className="font-bold text-white/70 animate-pulse">Accessing Engine Records...</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
 
 export default ServerProperties;
-

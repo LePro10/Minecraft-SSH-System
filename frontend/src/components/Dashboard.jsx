@@ -2,16 +2,51 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../context/ToastContext';
-import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio, Users, Fingerprint, Trash2 } from 'lucide-react';
+import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio, Users, Fingerprint, Trash2, Command } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { motion } from 'framer-motion';
+
+const LiquidMetricCard = ({ title, sub, value, unit, icon: Icon, color, percent }) => (
+    <motion.div
+        whileHover={{ y: -5, boxShadow: `0 20px 40px -10px ${color}30` }}
+        className="liquid-card p-6 group"
+    >
+        <div className="flex items-start justify-between mb-6">
+            <div className={`p-3 rounded-2xl bg-gradient-to-br transition-all duration-500 group-hover:scale-110 ${color === 'blue' ? 'from-blue-500/20 to-cyan-500/20 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)]' :
+                    color === 'red' ? 'from-red-500/20 to-orange-500/20 text-orange-400 shadow-[0_0_20px_rgba(249,115,22,0.3)]' :
+                        'from-green-500/20 to-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                }`}>
+                <Icon size={24} />
+            </div>
+            <div className="text-right">
+                <div className="text-xs font-bold uppercase tracking-wider text-white/40">{title}</div>
+                <div className="text-[10px] font-bold text-white/20">{sub}</div>
+            </div>
+        </div>
+
+        <div className="flex items-end gap-2 mb-4">
+            <span className="text-4xl font-black text-white tracking-tighter">{value}</span>
+            <span className="text-lg font-bold text-white/40 mb-1">{unit}</span>
+        </div>
+
+        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+                className={`h-full rounded-full shadow-[0_0_10px_currentColor] ${color === 'blue' ? 'bg-cyan-400 text-cyan-400' :
+                        color === 'red' ? 'bg-orange-400 text-orange-400' :
+                            'bg-emerald-400 text-emerald-400'
+                    }`}
+                initial={{ width: 0 }}
+                animate={{ width: `${percent}%` }}
+                transition={{ duration: 1, ease: [0.25, 0.8, 0.25, 1] }}
+            />
+        </div>
+    </motion.div>
+);
 
 const Dashboard = ({ onNavigate }) => {
     const { socket } = useSocket();
     const { stats, tps, logs, isConnected, startConsole, players, config, serverVersion, clearLogs } = useServer();
     const [command, setCommand] = useState('');
-    const [consoleActive, setConsoleActive] = useState(false);
-    const [history, setHistory] = useState([]);
-    const [historyIdx, setHistoryIdx] = useState(-1);
     const [chartData, setChartData] = useState([]);
     const [autoScroll, setAutoScroll] = useState(true);
     const { showToast } = useToast();
@@ -19,10 +54,13 @@ const Dashboard = ({ onNavigate }) => {
     const logsEndRef = useRef(null);
     const viewportRef = useRef(null);
 
+    const [history, setHistory] = useState([]);
+    const [historyIdx, setHistoryIdx] = useState(-1);
+
     const getTpsColor = (val) => {
-        if (val >= 18) return '#34c759';
-        if (val >= 15) return '#ffd60a';
-        return '#ff3b30';
+        if (val >= 18) return 'text-emerald-400';
+        if (val >= 15) return 'text-yellow-400';
+        return 'text-red-400';
     };
 
     useEffect(() => {
@@ -41,26 +79,14 @@ const Dashboard = ({ onNavigate }) => {
         if (!autoScroll) return;
         const viewport = viewportRef.current;
         if (!viewport) return;
-
-        // Immediate forced snap
         viewport.scrollTop = viewport.scrollHeight;
-
-        // Continuous enforcement for 1s after logs update to prevent "jerkiness"
-        let timer = setInterval(() => {
-            if (viewport.scrollTop !== viewport.scrollHeight) {
-                viewport.scrollTop = viewport.scrollHeight;
-            }
-        }, 50);
-
-        return () => clearInterval(timer);
     }, [logs, autoScroll]);
 
-    const handleScroll = (e) => {
+    const handleScroll = () => {
         if (autoScroll && viewportRef.current) {
             const viewport = viewportRef.current;
-            // Snappy snap: if user scrolls up even 1px, we slam it down
-            if (viewport.scrollTop < viewport.scrollHeight - viewport.clientHeight) {
-                viewport.scrollTop = viewport.scrollHeight;
+            if (viewport.scrollTop < viewport.scrollHeight - viewport.clientHeight - 50) {
+                // simple detection if user scrolled up
             }
         }
     };
@@ -108,10 +134,7 @@ const Dashboard = ({ onNavigate }) => {
                 showToast(`Action ${action} initiated.`, 'info');
                 if (action === 'start') {
                     if (clearLogs) clearLogs();
-                    // Give the server a moment to create/access the log file, then refresh console
-                    setTimeout(() => {
-                        if (startConsole) startConsole();
-                    }, 1000);
+                    setTimeout(() => { if (startConsole) startConsole(); }, 1000);
                 }
             } else {
                 const errData = await res.json();
@@ -123,267 +146,158 @@ const Dashboard = ({ onNavigate }) => {
     };
 
     return (
-        <div className="dashboard-root">
-            {/* Real-time Telemetry Grid */}
-            <div className="telemetry-grid">
-                <div className="telemetry-card glass-panel cpu">
-                    <div className="card-top">
-                        <div className="icon-glow cpu-glow"><Cpu size={24} /></div>
-                        <div className="meta">
-                            <span className="label">Processing Node</span>
-                            <span className="sub">Core Load Monitoring</span>
-                        </div>
+        <div className="flex flex-col h-full gap-6 pb-2">
+
+            {/* Telemetry Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+                <LiquidMetricCard
+                    title="Processing Node"
+                    sub="Core Load Monitoring"
+                    value={stats.cpu.toFixed(1)}
+                    unit="%"
+                    icon={Cpu}
+                    color="blue"
+                    percent={stats.cpu}
+                />
+                <LiquidMetricCard
+                    title="Memory Buffer"
+                    sub="RAM Allocation"
+                    value={(stats.ramUsed / 1024).toFixed(1)}
+                    unit="GB"
+                    icon={Database}
+                    color="red"
+                    percent={(stats.ramUsed / stats.ramTotal) * 100}
+                />
+                <LiquidMetricCard
+                    title="Storage Volume"
+                    sub="Persistent Storage"
+                    value={stats.disk.replace('%', '')}
+                    unit="%"
+                    icon={HardDrive}
+                    color="green"
+                    percent={parseFloat(stats.disk)}
+                />
+            </div>
+
+            {/* Status Ribbon */}
+            <div className="liquid-card p-3 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-6 px-4">
+                    <div className="flex items-center gap-3">
+                        <Activity className="text-white/40" size={16} />
+                        <span className="text-xs font-bold text-white/40 uppercase tracking-widest">TPS Rate</span>
+                        <span className={`font-mono text-lg font-bold ${getTpsColor(tps.t1)}`}>{tps.t1.toFixed(2)}</span>
                     </div>
-                    <div className="card-main">
-                        <div className="value-group">
-                            <span className="value">{stats.cpu.toFixed(1)}</span>
-                            <span className="unit">%</span>
-                        </div>
-                        <div className="mini-chart">
-                            <div className="load-label">Load Avg: {stats.load}</div>
-                            <div className="progress-track">
-                                <div className="progress-fill" style={{ width: `${stats.cpu}%` }}></div>
-                            </div>
-                        </div>
+                    <div className="w-px h-6 bg-white/10" />
+                    <div className="flex items-center gap-3">
+                        <Clock className="text-white/40" size={16} />
+                        <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Uptime</span>
+                        <span className="text-sm font-bold text-white/80">{stats.uptime}</span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10" />
+                    <div className="flex items-center gap-3 cursor-pointer hover:opacity-80" onClick={() => onNavigate && onNavigate('players')}>
+                        <Users className="text-white/40" size={16} />
+                        <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Players</span>
+                        <span className="text-sm font-bold text-white/80">{players.filter(p => p.online).length} Active</span>
                     </div>
                 </div>
 
-                <div className="telemetry-card glass-panel ram">
-                    <div className="card-top">
-                        <div className="icon-glow ram-glow"><Database size={24} /></div>
-                        <div className="meta">
-                            <span className="label">Memory Buffer</span>
-                            <span className="sub">Total System RAM Allocation</span>
-                        </div>
-                    </div>
-                    <div className="card-main">
-                        <div className="value-group">
-                            <span className="value">{(stats.ramUsed / 1024).toFixed(1)}</span>
-                            <span className="unit">GB</span>
-                        </div>
-                        <div className="mini-chart">
-                            <div className="load-label">Cached: {stats.ramCache} MB</div>
-                            <div className="progress-track">
-                                <div className="progress-fill" style={{ width: `${(stats.ramUsed / stats.ramTotal) * 100}%` }}></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="telemetry-card glass-panel disk">
-                    <div className="card-top">
-                        <div className="icon-glow disk-glow"><HardDrive size={24} /></div>
-                        <div className="meta">
-                            <span className="label">Storage Volume</span>
-                            <span className="sub">Persistent Object Storage</span>
-                        </div>
-                    </div>
-                    <div className="card-main">
-                        <div className="value-group">
-                            <span className="value">{stats.disk.replace('%', '')}</span>
-                            <span className="unit">%</span>
-                        </div>
-                        <div className="mini-chart">
-                            <div className="load-label">{stats.diskUsed} / {stats.diskTotal}</div>
-                            <div className="progress-track">
-                                <div className="progress-fill" style={{ width: stats.disk }}></div>
-                            </div>
-                        </div>
-                    </div>
+                <div className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 ${isConnected ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                    }`}>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 shadow-[0_0_10px_currentColor]' : 'bg-red-400'}`} />
+                    {isConnected ? 'Node Online' : 'Node Offline'}
                 </div>
             </div>
 
-            {/* Network & Performance Status Bar */}
-            <div className="status-ribbon glass-panel">
-                <div className="status-section">
-                    <div className="perf-metric">
-                        <Activity size={18} className="pulse" />
-                        <span className="perf-label">Heartrate (TPS):</span>
-                        <span className="tps-block" style={{ color: getTpsColor(tps.t1) }}>{tps.t1.toFixed(2)}</span>
-                    </div>
-                    <div className="v-sep"></div>
-                    <div className="perf-metric">
-                        <Clock size={16} />
-                        <span className="perf-label">Uptime:</span>
-                        <span className="uptime-val">{stats.uptime}</span>
-                    </div>
-                    <div className="v-sep"></div>
-                    <div className="perf-metric" onClick={() => onNavigate && onNavigate('players')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
-                        <Users size={16} />
-                        <span className="perf-label">Players:</span>
-                        <span className="uptime-val">{players.filter(p => p.online).length} Active</span>
-                    </div>
-                    <div className="v-sep"></div>
-                    <div className="perf-metric">
-                        <Fingerprint size={16} />
-                        <span className="perf-label">Release:</span>
-                        <span className="uptime-val">{serverVersion || 'Waiting for log...'}</span>
-                    </div>
-                </div>
-                <div className="status-badge" style={{ background: isConnected ? 'rgba(52, 199, 89, 0.2)' : 'rgba(255, 59, 48, 0.2)', color: isConnected ? '#34c759' : '#ff3b30' }}>
-                    <div className="dot" style={{ background: isConnected ? '#34c759' : '#ff3b30' }} />
-                    {isConnected ? 'NODE CONNECTED' : 'NODE OFFLINE'}
-                </div>
-            </div>
+            {/* Ops Grid */}
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
 
-            {/* Operations Interface */}
-            <div className="ops-grid">
-                <div className="glass-panel console-box">
-                    <div className="box-header">
-                        <div className="h-left">
-                            <ConsoleIcon size={16} />
-                            <h3>Terminal Access</h3>
+                {/* Console */}
+                <div className="liquid-card flex flex-col min-h-0 relative group">
+                    <div className="flex items-center justify-between p-5 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                            <Terminal size={18} className="text-white/60" />
+                            <h3 className="text-sm font-bold text-white/90 uppercase tracking-widest">Terminal Access</h3>
                         </div>
-                        <div className="h-right">
-                            <button className={`op-btn ${autoScroll ? 'info-lite' : 'danger-lite'}`} onClick={() => setAutoScroll(!autoScroll)} title={autoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}>
-                                {autoScroll ? <Activity size={14} /> : <Zap size={14} />}
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setAutoScroll(!autoScroll)} className={`p-2 rounded-lg transition-colors border border-transparent ${autoScroll ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
+                                <Activity size={14} />
                             </button>
-                            <button className="op-btn danger-lite" onClick={() => clearLogs && clearLogs()} title="Clear Console Binary"><Trash2 size={14} /></button>
-                            <div className="v-sep-mini" />
-                            <button className="op-btn info-lite" onClick={() => socket?.emit('console:input', { command: 'list' })} title="List Online Players"><Users size={14} /></button>
-                            <button className="op-btn warning-lite" onClick={() => socket?.emit('console:input', { command: 'tps' })} title="Check Server TPS"><Activity size={14} /></button>
-                            <div className="v-sep-mini" />
-                            <button className="op-btn start" onClick={() => control('start')} title="Boot Link"><Play size={14} /></button>
-                            <button className="op-btn stop" onClick={() => control('stop')} title="Terminate Link"><Square size={14} /></button>
-                            <button className="op-btn reload" onClick={() => control('reload')} title="Reload Server"><RefreshCw size={14} /></button>
+                            <div className="w-px h-4 bg-white/10 mx-1" />
+                            <button onClick={() => control('start')} className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all hover:-translate-y-0.5"><Play size={14} /></button>
+                            <button onClick={() => control('stop')} className="p-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all hover:-translate-y-0.5"><Square size={14} /></button>
+                            <button onClick={() => control('reload')} className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all hover:-translate-y-0.5 hover:rotate-180"><RefreshCw size={14} /></button>
                         </div>
                     </div>
-                    <div className="console-viewport" ref={viewportRef} onScroll={handleScroll}>
-                        {logs.map((log, i) => <div key={i} className="terminal-line">{log}</div>)}
+
+                    <div className="flex-1 overflow-y-auto p-5 font-mono text-sm space-y-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent bg-black/20" ref={viewportRef} onScroll={handleScroll}>
+                        {logs.map((log, i) => (
+                            <div key={i} className="text-white/70 break-all pl-4 relative before:content-['>'] before:absolute before:left-0 before:opacity-30 before:text-blue-400">
+                                {log}
+                            </div>
+                        ))}
                         <div ref={logsEndRef} />
                     </div>
-                    <form onSubmit={sendCommand} className="command-input">
-                        <span className="prompt">root@mc:~$</span>
-                        <input value={command} onChange={e => setCommand(e.target.value)} onKeyDown={handleKeyDown} placeholder="Awaiting instruction..." />
+
+                    <form onSubmit={sendCommand} className="p-4 border-t border-white/5 bg-white/[0.02] flex items-center gap-4">
+                        <div className="text-blue-400 font-mono font-bold select-none">root@mc:~$</div>
+                        <input
+                            value={command}
+                            onChange={e => setCommand(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="flex-1 bg-transparent border-none outline-none text-white font-mono placeholder-white/20"
+                            placeholder="Awaiting instruction..."
+                        />
+                        <Command size={14} className="text-white/20" />
                     </form>
                 </div>
 
-                <div className="glass-panel analytics-box">
-                    <div className="box-header">
-                        <div className="h-left">
-                            <Radio size={16} />
-                            <h3>Historical Data</h3>
+                {/* Analytics Side Panel */}
+                <div className="liquid-card flex flex-col max-h-full">
+                    <div className="flex items-center justify-between p-5 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                            <Radio size={18} className="text-white/60" />
+                            <h3 className="text-sm font-bold text-white/90 uppercase tracking-widest">History</h3>
                         </div>
-                        <div className="stat-pill">{tps.t1.toFixed(1)} TPS</div>
+                        <div className="px-2 py-1 bg-white/5 rounded text-[10px] font-mono font-bold">{tps.t1.toFixed(1)} TPS</div>
                     </div>
-                    <div className="chart-container">
+                    <div className="flex-1 min-h-[200px] p-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
                                 <defs>
                                     <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#007aff" stopOpacity={0.4} />
-                                        <stop offset="95%" stopColor="#007aff" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ff2d55" stopOpacity={0.4} />
-                                        <stop offset="05%" stopColor="#ff2d55" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#f472b6" stopOpacity={0.4} />
+                                        <stop offset="05%" stopColor="#f472b6" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <XAxis dataKey="name" hide />
                                 <YAxis hide domain={[0, 100]} />
-                                <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(15px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px' }} />
-                                <Area type="monotone" dataKey="cpu" stroke="#007aff" fill="url(#cpuGrad)" strokeWidth={3} isAnimationActive={false} />
-                                <Area type="monotone" dataKey="ram" stroke="#ff2d55" fill="url(#ramGrad)" strokeWidth={3} isAnimationActive={false} />
+                                <Tooltip
+                                    contentStyle={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}
+                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                    labelStyle={{ display: 'none' }}
+                                />
+                                <Area type="monotone" dataKey="cpu" stroke="#22d3ee" fill="url(#cpuGrad)" strokeWidth={2} isAnimationActive={false} />
+                                <Area type="monotone" dataKey="ram" stroke="#f472b6" fill="url(#ramGrad)" strokeWidth={2} isAnimationActive={false} />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                    <div className="legend-row">
-                        <div className="legend-item"><div className="dot b" /> Processor</div>
-                        <div className="legend-item"><div className="dot r" /> Memory</div>
+                    <div className="p-5 border-t border-white/5 flex items-center justify-center gap-6">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/50">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_#22d3ee]" /> Processor
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/50">
+                            <div className="w-2 h-2 rounded-full bg-pink-400 shadow-[0_0_10px_#f472b6]" /> Memory
+                        </div>
                     </div>
                 </div>
+
             </div>
-
-            <div style={{ position: 'fixed', bottom: 10, right: 10, fontSize: '10px', opacity: 0.3, color: 'white', pointerEvents: 'none' }}>
-                Dashboard v3.0.6 | Backend {isConnected ? 'Link Active' : 'Standby'}
-            </div>
-
-            <style jsx>{`
-                .dashboard-root { display: flex; flex-direction: column; gap: 32px; height: 100%; overflow: hidden; padding-bottom: 20px; }
-                
-                /* TELEMETRY CARDS */
-                .telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; flex-shrink: 0; }
-                .telemetry-card { padding: 32px; display: flex; flex-direction: column; gap: 24px; transition: 0.4s var(--ease-liquid); }
-                .telemetry-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-                
-                .card-top { display: flex; align-items: center; gap: 20px; }
-                .icon-glow { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: white; position: relative; }
-                .icon-glow::after { content: ''; position: absolute; inset: -5px; border-radius: 20px; background: inherit; filter: blur(15px); opacity: 0.3; }
-                
-                .cpu-glow { background: linear-gradient(135deg, #007aff, #00c6ff); }
-                .ram-glow { background: linear-gradient(135deg, #ff2d55, #ff512f); }
-                .disk-glow { background: linear-gradient(135deg, #34c759, #43e97b); }
-                
-                .meta { display: flex; flex-direction: column; }
-                .label { font-size: 0.8rem; font-weight: 950; color: white; letter-spacing: 1px; text-transform: uppercase; }
-                .sub { font-size: 0.65rem; color: var(--text-secondary); opacity: 0.5; font-weight: 700; }
-
-                .card-main { display: flex; flex-direction: column; gap: 12px; }
-                .value-group { display: flex; align-items: baseline; gap: 6px; }
-                .value { font-size: 2.8rem; font-weight: 950; color: white; letter-spacing: -2px; line-height: 1; }
-                .unit { font-size: 1rem; font-weight: 800; color: var(--text-secondary); opacity: 0.4; }
-                
-                .mini-chart { display: flex; flex-direction: column; gap: 8px; }
-                .load-label { font-size: 0.65rem; font-family: var(--font-mono); color: var(--text-secondary); opacity: 0.6; }
-                .progress-track { height: 6px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
-                .progress-fill { height: 100%; background: white; border-radius: 10px; transition: width 0.8s var(--ease-liquid); }
-                
-                .cpu .progress-fill { background: #007aff; box-shadow: 0 0 10px rgba(0,122,255,0.5); }
-                .ram .progress-fill { background: #ff2d55; box-shadow: 0 0 10px rgba(255,45,85,0.5); }
-                .disk .progress-fill { background: #34c759; box-shadow: 0 0 10px rgba(52,199,89,0.5); }
-
-                /* STATUS RIBBON */
-                .status-ribbon { padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.05); }
-                .status-section { display: flex; align-items: center; gap: 32px; }
-                .perf-metric { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 0.9rem; }
-                .perf-label { color: var(--text-secondary); opacity: 0.5; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
-                .tps-block { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 900; }
-                .uptime-val { color: white; opacity: 0.8; }
-                .v-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.05); }
-                
-                .status-badge { padding: 6px 16px; border-radius: 50px; font-size: 0.7rem; font-weight: 950; letter-spacing: 1.5px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.1); }
-                .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
-                .pulse { animation: pulse 2s infinite; }
-                @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-
-                /* OPS GRID */
-                .ops-grid { flex: 1; display: grid; grid-template-columns: 1fr 360px; gap: 32px; min-height: 0; }
-                
-                .console-box { display: flex; flex-direction: column; overflow: hidden; background: rgba(0,0,0,0.3); }
-                .box-header { padding: 20px 28px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
-                .h-left { display: flex; align-items: center; gap: 14px; }
-                .h-left h3 { margin: 0; font-size: 0.85rem; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: 1px; }
-                
-                .h-right { display: flex; gap: 12px; }
-                .op-btn { width: 40px; height: 40px; border-radius: 12px; border: none; background: rgba(255,255,255,0.03); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; border: 1px solid rgba(255,255,255,0.05); }
-                .op-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-3px); }
-                .start:hover { color: #34c759; border-color: rgba(52,199,89,0.3); }
-                .stop:hover { color: #ff3b30; border-color: rgba(255,59,48,0.3); }
-                .reload:hover { color: #007aff; transform: rotate(180deg); }
-                .info-lite:hover { color: #64d2ff; border-color: rgba(100,210,255,0.3); }
-                .warning-lite:hover { color: #ffd60a; border-color: rgba(255,214,10,0.3); }
-                .v-sep-mini { width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 4px; }
-
-                .console-viewport { flex: 1; padding: 32px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.8; background: rgba(0,0,0,0.2); scrollbar-width: thin; }
-                .terminal-line { margin-bottom: 8px; color: #d1d5db; position: relative; padding-left: 20px; }
-                .terminal-line::before { content: '>'; position: absolute; left: 0; opacity: 0.3; color: var(--accent-primary); }
-                
-                .command-input { display: flex; align-items: center; padding: 20px 32px; background: rgba(0,0,0,0.4); border-top: 1px solid rgba(255,255,255,0.05); gap: 16px; }
-                .prompt { color: var(--accent-primary); font-weight: 950; font-family: var(--font-mono); }
-                .command-input input { flex: 1; background: transparent !important; border: none !important; color: white !important; font-family: var(--font-mono); outline: none; font-size: 0.95rem; }
-
-                .analytics-box { padding: 32px; display: flex; flex-direction: column; gap: 24px; }
-                .stat-pill { padding: 4px 12px; border-radius: 6px; background: rgba(255,255,255,0.05); font-family: var(--font-mono); font-size: 0.8rem; font-weight: 800; }
-                .chart-container { flex: 1; min-height: 200px; margin: 10px 0; }
-                .legend-row { display: flex; gap: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); }
-                .legend-item { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
-                .dot { width: 10px; height: 10px; border-radius: 50%; }
-                .dot.b { background: #007aff; box-shadow: 0 0 10px rgba(0,122,255,0.4); }
-                .dot.r { background: #ff2d55; box-shadow: 0 0 10px rgba(255,45,85,0.4); }
-            `}</style>
         </div>
     );
 };
 
 export default Dashboard;
-
