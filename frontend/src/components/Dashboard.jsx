@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useSocket } from '../context/SocketContext';
-import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { Play, Square, RefreshCw, Terminal, Cpu, HardDrive, Database, Activity, Clock, Zap, Shield, Maximize2, Terminal as ConsoleIcon, Radio, Users, Fingerprint } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-const Dashboard = () => {
+const Dashboard = ({ onNavigate }) => {
     const { socket } = useSocket();
-    const { stats, tps, logs, isConnected, startConsole } = useServer();
+    const { stats, tps, logs, isConnected, startConsole, players, config } = useServer();
     const [command, setCommand] = useState('');
+    const [consoleActive, setConsoleActive] = useState(false);
+    const [history, setHistory] = useState([]);
+    const [historyIdx, setHistoryIdx] = useState(-1);
     const [chartData, setChartData] = useState([]);
+    const { showToast } = useToast();
 
     const logsEndRef = useRef(null);
 
@@ -34,21 +39,50 @@ const Dashboard = () => {
         logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [logs]);
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const nextIdx = historyIdx + 1;
+            if (nextIdx < history.length) {
+                setHistoryIdx(nextIdx);
+                setCommand(history[nextIdx]);
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIdx = historyIdx - 1;
+            if (nextIdx >= 0) {
+                setHistoryIdx(nextIdx);
+                setCommand(history[nextIdx]);
+            } else {
+                setHistoryIdx(-1);
+                setCommand('');
+            }
+        }
+    };
+
     const sendCommand = (e) => {
         e.preventDefault();
         if (command.trim() && socket) {
             socket.emit('console:input', { command });
+            setHistory(prev => [command, ...prev.filter(h => h !== command)].slice(0, 50));
+            setHistoryIdx(-1);
             setCommand('');
         }
     };
 
-    const control = (action) => {
+    const control = async (action) => {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        fetch(`${API_URL}/api/mc/control`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action })
-        }).catch(console.error);
+        try {
+            const res = await fetch(`${API_URL}/api/mc/control`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            if (res.ok) showToast(`Action ${action} initiated.`, 'info');
+            else showToast(`Control failed: ${action}`, 'error');
+        } catch (e) {
+            showToast('Host connection lost.', 'error');
+        }
     };
 
     return (
@@ -136,6 +170,18 @@ const Dashboard = () => {
                         <span className="perf-label">Uptime:</span>
                         <span className="uptime-val">{stats.uptime}</span>
                     </div>
+                    <div className="v-sep"></div>
+                    <div className="perf-metric" onClick={() => onNavigate && onNavigate('players')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+                        <Users size={16} />
+                        <span className="perf-label">Players:</span>
+                        <span className="uptime-val">{players.filter(p => p.online).length} Active</span>
+                    </div>
+                    <div className="v-sep"></div>
+                    <div className="perf-metric">
+                        <Fingerprint size={16} />
+                        <span className="perf-label">Release:</span>
+                        <span className="uptime-val">SMM v2.5 Stable</span>
+                    </div>
                 </div>
                 <div className="status-badge" style={{ background: isConnected ? 'rgba(52, 199, 89, 0.2)' : 'rgba(255, 59, 48, 0.2)', color: isConnected ? '#34c759' : '#ff3b30' }}>
                     <div className="dot" style={{ background: isConnected ? '#34c759' : '#ff3b30' }} />
@@ -163,7 +209,7 @@ const Dashboard = () => {
                     </div>
                     <form onSubmit={sendCommand} className="command-input">
                         <span className="prompt">root@mc:~$</span>
-                        <input value={command} onChange={e => setCommand(e.target.value)} placeholder="Awaiting instruction..." />
+                        <input value={command} onChange={e => setCommand(e.target.value)} onKeyDown={handleKeyDown} placeholder="Awaiting instruction..." />
                     </form>
                 </div>
 

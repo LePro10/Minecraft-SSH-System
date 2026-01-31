@@ -99,18 +99,42 @@ class MinecraftController {
     }
 
     async controlServer(req, res) {
-        const { action, path: serverPath, screenName = 'minecraft' } = req.body;
+        const { action, serverPath } = req.body;
+
         try {
-            if (action === 'start') {
-                await sshService.exec(`cd ${serverPath} && screen -dmS ${screenName} ./start.sh`);
-            } else if (action === 'stop') {
-                await sshService.exec(`screen -S ${screenName} -p 0 -X stuff "stop^M"`);
-            } else if (action === 'restart') {
-                await sshService.exec(`screen -S ${screenName} -p 0 -X stuff "stop^M"`);
-                setTimeout(async () => {
-                    await sshService.exec(`cd ${serverPath} && screen -dmS ${screenName} ./start.sh`);
-                }, 5000);
+            if (!sshService.connected) {
+                return res.status(500).json({ error: 'SSH not connected' });
             }
+
+            // Load config to get custom scripts
+            const configPath = path.join(__dirname, '..', '..', 'config.json');
+            let config = { startScript: './start.sh', stopScript: 'stop', screenName: 'minecraft' };
+            if (fs.existsSync(configPath)) {
+                config = { ...config, ...JSON.parse(fs.readFileSync(configPath)) };
+            }
+
+            const activePath = serverPath || config.path;
+            const screen = config.screenName;
+
+            if (action === 'start') {
+                await sshService.exec(`cd ${activePath} && screen -dmS ${screen} ${config.startScript}`);
+            } else if (action === 'stop') {
+                // Always send stop command to console, never use script
+                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "stop\\n"`);
+            } else if (action === 'restart') {
+                // Stop first
+                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "stop\\n"`);
+                // Wait 5 seconds then start
+                setTimeout(async () => {
+                    await sshService.exec(`cd ${activePath} && screen -dmS ${screen} ${config.startScript}`);
+                }, 5000);
+            } else if (action === 'kill') {
+                await sshService.exec(`screen -S ${screen} -X quit`);
+            } else if (action === 'reload') {
+                // Send reload confirm command to Minecraft console
+                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "reload confirm\\n"`);
+            }
+
             res.json({ success: true });
         } catch (err) {
             res.status(500).json({ error: err.message });

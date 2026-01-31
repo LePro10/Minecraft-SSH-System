@@ -91,13 +91,34 @@ class PluginController {
             const pluginsDir = path.posix.join(serverPath, 'plugins');
             const safeName = resourceName.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
 
-            const jarPath = path.posix.join(pluginsDir, `${safeName}.jar`);
+            // Try specific safe name first
+            let jarPath = path.posix.join(pluginsDir, `${safeName}.jar`);
+            let exists = await sshService.exec(`ls "${jarPath}"`).then(() => true).catch(() => false);
+
+            if (!exists) {
+                // Try searching for any jar containing the name
+                const lowName = resourceName.toLowerCase().replace(/[^a-z0-9]/gi, '');
+                const lsResult = await sshService.exec(`ls "${pluginsDir}"`);
+                const files = lsResult.split(/\s+/);
+                const match = files.find(f => f.toLowerCase().includes(lowName) && f.endsWith('.jar'));
+
+                if (match) {
+                    jarPath = path.posix.join(pluginsDir, match);
+                    exists = true;
+                }
+            }
+
             const folderPath = path.posix.join(pluginsDir, safeName);
+            const folderExists = await sshService.exec(`ls -d "${folderPath}"`).then(() => true).catch(() => false);
 
-            console.log(`[Plugins] Uninstalling ${resourceName}: Deleting ${jarPath} and ${folderPath}`);
+            console.log(`[Plugins] Uninstalling ${resourceName}: Target JAR: ${jarPath}`);
 
-            // Delete the jar and its data folder
-            await sshService.exec(`rm -f "${jarPath}" && rm -rf "${folderPath}"`);
+            if (exists) {
+                await sshService.exec(`rm -f "${jarPath}"`);
+            }
+            if (folderExists) {
+                await sshService.exec(`rm -rf "${folderPath}"`);
+            }
 
             res.json({ success: true, message: `${resourceName} uninstalled.` });
         } catch (error) {

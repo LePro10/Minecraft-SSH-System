@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useServer } from '../context/ServerContext';
+import { useToast } from '../context/ToastContext';
 import { Search, Download, Star, ExternalLink, Loader2, CheckCircle, Package, ArrowRight, AlertCircle, Trash2, Filter, Sparkles } from 'lucide-react';
 
 const PluginManager = () => {
@@ -15,6 +16,7 @@ const PluginManager = () => {
     const [showInstalledOnly, setShowInstalledOnly] = useState(false);
 
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const { showToast } = useToast();
 
     const fetchPlugins = async (query = '', p = 1) => {
         setLoading(true);
@@ -58,7 +60,7 @@ const PluginManager = () => {
     }, [isConnected, config.path]);
 
     const handleInstall = async (plugin) => {
-        if (!isConnected) return alert('Please connect to SSH first!');
+        if (!isConnected) return showToast('Establish SSH link first.', 'error');
         setInstalling(plugin.id);
         try {
             const res = await fetch(`${API_BASE}/api/plugins/install`, {
@@ -72,14 +74,15 @@ const PluginManager = () => {
             });
             const data = await res.json();
             if (res.ok) {
+                showToast(`${plugin.name} integrated successfully.`, 'success');
                 fetchInstalled();
-            } else alert(`Error: ${data.error}`);
-        } catch (e) { alert('Installation failed. Check backend logs.'); }
+            } else showToast(`Download failed: ${data.error}`, 'error');
+        } catch (e) { showToast('Spiget downlink interrupted.', 'error'); }
         finally { setInstalling(null); }
     };
 
     const handleUninstall = async (plugin) => {
-        if (!isConnected) return alert('Please connect to SSH first!');
+        if (!isConnected) return showToast('Establish SSH link first.', 'error');
         if (!window.confirm(`Are you sure you want to uninstall ${plugin.name} and DELETE its data folder?`)) return;
 
         setUninstalling(plugin.id);
@@ -94,9 +97,10 @@ const PluginManager = () => {
             });
             const data = await res.json();
             if (res.ok) {
+                showToast(`${plugin.name} purged from archive.`, 'success');
                 fetchInstalled();
-            } else alert(`Error: ${data.error}`);
-        } catch (e) { alert('Uninstall failed. Check backend logs.'); }
+            } else showToast(`Purge failed: ${data.error}`, 'error');
+        } catch (e) { showToast('Uninstall sync failed.', 'error'); }
         finally { setUninstalling(null); }
     };
 

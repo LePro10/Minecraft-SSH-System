@@ -29,8 +29,10 @@ let pollInterval = null;
 // Persistent Configuration
 const CONFIG_FILE = path.join(__dirname, '..', 'config.json');
 let serverConfig = {
-    path: '/home/mcserver',
-    screenName: 'minecraft'
+    path: '/mcfolder/',
+    screenName: 'minecraft',
+    startScript: './run.sh',
+    stopScript: 'stop'
 };
 
 // Load initial config

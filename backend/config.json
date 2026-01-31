@@ -1,4 +1,6 @@
 {
   "path": "/home/serverusr/mcserver",
-  "screenName": "minecraft"
+  "screenName": "minecraft",
+  "startScript": "-jar server.jar",
+  "stopScript": "stop"
 }
