@@ -141,17 +141,17 @@ const WelcomeModal = ({ onComplete, initialTheme, setTheme }) => {
                 .step-sub { color: var(--text-secondary); opacity: 0.5; margin: 8px 0 40px; font-weight: 700; font-size: 0.9rem; }
 
                 .aesthetic-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; margin-bottom: 40px; }
-                .aesthetic-card { padding: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 12px; position: relative; transition: 0.3s; background: rgba(255,255,255,0.02); }
+                .aesthetic-card { padding: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; position: relative; transition: 0.3s; background: rgba(255,255,255,0.02); aspect-ratio: 1/1; border-radius: 50%; }
                 .aesthetic-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.05); }
-                .aesthetic-card.active { border-color: var(--accent-primary); background: rgba(var(--accent-primary-rgb), 0.1); }
+                .aesthetic-card.active { border-color: var(--accent-primary); background: rgba(var(--accent-primary-rgb), 0.1); border: 2px solid var(--accent-primary); }
                 
-                .a-preview { width: 50px; height: 50px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+                .a-preview { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
                 .glass-a { background: var(--accent-gradient); }
                 .dark-a { background: #0c0c0e; border: 1px solid rgba(255,255,255,0.1); color: #555; }
                 .coder-a { background: #000; border: 1px solid #0f0; color: #0f0; }
                 
                 .a-label { font-size: 0.75rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-                .a-check { position: absolute; top: 10px; right: 10px; background: var(--accent-primary); color: white; border-radius: 50%; padding: 2px; }
+                .a-check { position: absolute; top: 0; right: 0; background: var(--accent-primary); color: white; border-radius: 50%; padding: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
 
                 .next-util-btn { width: 100%; height: 50px; border: none; cursor: pointer; font-weight: 800; color: white; margin-top: auto; }
 

@@ -98,30 +98,6 @@ const Settings = ({ theme, setTheme, prefill }) => {
         }
     };
 
-    const handleWallpaperUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('wallpaper', file);
-
-        setUploading(true);
-        try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/settings/wallpaper`, {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            if (data.url) {
-                document.documentElement.style.setProperty('--wallpaper', `url(${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${data.url})`);
-            }
-        } catch (error) {
-            console.error('Wallpaper upload failed:', error);
-        } finally {
-            setUploading(false);
-        }
-    };
-
 
     return (
         <div className="settings-scroll-container">
@@ -173,7 +149,7 @@ const Settings = ({ theme, setTheme, prefill }) => {
                         </div>
 
                         {isConnected ? (
-                            <button type="button" onClick={handleDisconnect} className="glass-button btn-danger">Disconnect Server</button>
+                            <button type="button" onClick={handleDisconnect} className="glass-button btn-danger disconnect-btn">Disconnect Server</button>
                         ) : (
                             <button type="submit" className={`glass-button ${isConnecting ? 'loading' : ''}`} disabled={isConnecting}>
                                 {isConnecting ? <><Loader2 className="animate-spin" size={18} /> Connecting...</> : 'Connect SSH'}
@@ -233,29 +209,6 @@ const Settings = ({ theme, setTheme, prefill }) => {
                         </div>
                     </div>
 
-                    <div className="wallpaper-upload-section">
-                        <label>Custom Wallpaper</label>
-                        <div className="upload-box glass-panel" onClick={() => fileInputRef.current?.click()}>
-                            {uploading ? (
-                                <Loader2 className="animate-spin" size={32} />
-                            ) : (
-                                <>
-                                    <Upload size={32} />
-                                    <div className="upload-texts">
-                                        <span className="main-text">Click to upload new background</span>
-                                        <span className="sub-text">JPG, PNG or WebP supported</span>
-                                    </div>
-                                </>
-                            )}
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleWallpaperUpload}
-                                accept="image/*"
-                            />
-                        </div>
-                    </div>
                 </div>
 
                 <div className="divider"></div>
@@ -269,38 +222,41 @@ const Settings = ({ theme, setTheme, prefill }) => {
                         </div>
                     </div>
 
-                    <form onSubmit={handleConfigSave} className="settings-form">
-                        <div className="form-group">
+                    <form onSubmit={handleConfigSave} className="settings-form engine-config-form">
+                        <div className="form-group full-width mb-32">
                             <label>Base Server Directory</label>
-                            <input className="glass-input" value={mcPath} onChange={e => setMcPath(e.target.value)} />
-                            <span className="hint">Must be the absolute path to your minecraft directory.</span>
+                            <input className="glass-input" value={mcPath} onChange={e => setMcPath(e.target.value)} placeholder="/home/user/mcserver" />
+                            <span className="hint">Absolute path where your server files are located.</span>
                         </div>
-                        <div className="form-group">
-                            <label>Screen Instance Name</label>
-                            <input className="glass-input" value={mcScreen} onChange={e => setMcScreen(e.target.value)} />
-                        </div>
-                        <div className="form-group-row">
+
+                        <div className="engine-grid">
                             <div className="form-group">
-                                <label>Start Command/Script</label>
-                                <input className="glass-input" value={mcStart} onChange={e => setMcStart(e.target.value)} />
-                                <span className="hint">e.g. ./start.sh or java -jar server.jar</span>
+                                <label>Screen Instance Name</label>
+                                <input className="glass-input" value={mcScreen} onChange={e => setMcScreen(e.target.value)} placeholder="minecraft" />
+                                <span className="hint">Used for default screen-based execution.</span>
                             </div>
                             <div className="form-group">
-                                <label>Stop Command/Script</label>
-                                <input className="glass-input" value={mcStop} onChange={e => setMcStop(e.target.value)} />
-                                <span className="hint">e.g. stop or ./stop.sh</span>
+                                <label>Start Command (Optional)</label>
+                                <input className="glass-input" value={mcStart} onChange={e => setMcStart(e.target.value)} placeholder="java -jar server.jar" />
+                                <span className="hint">Leave empty for default (java -jar server.jar).</span>
+                            </div>
+                            <div className="form-group">
+                                <label>Stop Command</label>
+                                <input className="glass-input" value={mcStop} onChange={e => setMcStop(e.target.value)} placeholder="stop" />
+                                <span className="hint">Command sent to console to stop server.</span>
                             </div>
                         </div>
+
                         {saveStatus && (
                             <div className="success-banner">
                                 <Check size={16} />
                                 <span>{saveStatus}</span>
                             </div>
                         )}
-                        <button type="submit" className="glass-button engine-submit-btn">Update Engine Config</button>
+                        <button type="submit" className="glass-button engine-submit-btn">Update Engine Configuration</button>
                     </form>
                 </div>
-            </div>
+            </div >
 
             <style jsx>{`
                 .success-banner {
@@ -360,9 +316,9 @@ const Settings = ({ theme, setTheme, prefill }) => {
                     margin-bottom: 24px;
                 }
                 .form-group { display: flex; flex-direction: column; gap: 8px; }
-                .form-group label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+                .form-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-left: 2px; }
                 .private-key-textarea { height: 120px; font-family: var(--font-mono); font-size: 0.8rem; }
-                .hint { font-size: 0.8rem; color: var(--text-secondary); opacity: 0.7; font-style: italic; }
+                .hint { font-size: 0.75rem; color: var(--text-secondary); opacity: 0.5; font-style: normal; margin-top: 4px; margin-left: 2px; }
                 
                 .theme-grid {
                     display: grid;
@@ -373,20 +329,23 @@ const Settings = ({ theme, setTheme, prefill }) => {
                 .theme-card {
                     padding: 0;
                     border: none;
-                    text-align: left;
-                    cursor: pointer;
+                    display: flex;
+                    flex-direction: column;
                     background: rgba(255,255,255,0.03);
-                    border: 1px solid rgba(255,255,255,0.05);
-                }
-                .theme-card.active {
-                    border-color: var(--accent-primary);
-                    background: rgba(var(--accent-primary), 0.05);
-                }
-                .theme-preview {
-                    height: 100px;
-                    width: 100%;
-                    border-bottom: 1px solid rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 16px;
+                    overflow: hidden;
+                    cursor: pointer;
+                    transition: all 0.2s;
                     position: relative;
+                }
+                .theme-card:hover { transform: translateY(-2px); border-color: var(--accent-primary); }
+                .theme-card.active { border: 2px solid var(--accent-primary); box-shadow: 0 0 20px rgba(var(--accent-primary-rgb), 0.2); }
+                
+                .theme-preview {
+                    width: 100%;
+                    aspect-ratio: 1 / 1; /* Force Square */
+                    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(0,0,0,0));
                 }
                 .glass-preview { background: linear-gradient(135deg, #1e293b, #0f172a); }
                 .forest-preview { background: linear-gradient(135deg, #064e3b, #065f46); }
@@ -407,40 +366,20 @@ const Settings = ({ theme, setTheme, prefill }) => {
                     justify-content: center;
                     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
                 }
-
+                
                 .theme-info { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
                 .theme-name { font-weight: 700; color: var(--text-primary); }
                 .theme-desc { font-size: 0.8rem; color: var(--text-secondary); }
 
-                .wallpaper-upload-section { margin-top: 40px; }
-                .wallpaper-upload-section label { display: block; margin-bottom: 16px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; }
-                .upload-box {
-                    height: 140px;
-                    border: 2px dashed rgba(255,255,255,0.1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 24px;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                    background: rgba(255,255,255,0.01);
-                }
-                .upload-box:hover {
-                    border-color: var(--accent-primary);
-                    background: rgba(var(--accent-primary), 0.05);
-                    transform: scale(1.01);
-                }
-                .upload-texts { display: flex; flex-direction: column; }
-                .upload-texts .main-text { font-weight: 700; font-size: 1.1rem; }
-                .upload-texts .sub-text { font-size: 0.85rem; color: var(--text-secondary); }
-
                 .customization-row { margin-top: 32px; }
+                .customization-row label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
                 .radius-selector {
                     display: grid;
                     grid-template-columns: 1fr 1fr 1fr;
-                    padding: 8px;
-                    gap: 8px;
-                    margin-top: 10px;
+                    padding: 4px;
+                    background: rgba(0,0,0,0.3);
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.05);
                 }
                 .radius-selector button {
                     background: transparent;
@@ -456,35 +395,40 @@ const Settings = ({ theme, setTheme, prefill }) => {
                 }
                 .radius-selector button.active {
                     background: var(--accent-gradient);
-                    color: white;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                color: white;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
                 }
 
                 .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%); }
-                .form-group-row {
+                .disconnect-btn { margin-top: 32px; width: 100%; }
+                
+                .engine-grid {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
                     gap: 24px;
-                    margin-top: 12px;
+                    margin-top: 24px;
                 }
-                .engine-submit-btn { margin-top: 32px; width: 100%; }
+                .mb-32 { margin-bottom: 32px; }
+                .engine-config-form .full-width { grid-column: span 2; }
+                .engine-submit-btn { margin-top: 40px; width: 100%; border-color: var(--accent-primary); color: white; }
+                .engine-submit-btn:hover { background: var(--accent-primary); color: black; }
 
-                .obsidian-preview { background: #000; }
-                .midnight-preview { background: #020617; }
-                .aurora-preview { background: #011c1a; }
-                .cyberpunk-preview { background: #0b0114; }
-                .sakura-preview { background: #1a0b0f; }
-                .gold-preview { background: #12100e; }
-                .berry-preview { background: #120512; }
-                .slate-preview { background: #0f172a; }
-                .crimson-preview { background: #1a0505; }
-                .steel-preview { background: #0d1117; }
-                .moss-preview { background: #111a11; }
+                .obsidian-preview {background: #000; }
+                .midnight-preview {background: #020617; }
+                .aurora-preview {background: #011c1a; }
+                .cyberpunk-preview {background: #0b0114; }
+                .sakura-preview {background: #1a0b0f; }
+                .gold-preview {background: #12100e; }
+                .berry-preview {background: #120512; }
+                .slate-preview {background: #0f172a; }
+                .crimson-preview {background: #1a0505; }
+                .steel-preview {background: #0d1117; }
+                .moss-preview {background: #111a11; }
 
-                @keyframes animate-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                .animate-spin { animation: animate-spin 1s linear infinite; }
+                @keyframes animate-spin {from {transform: rotate(0deg); } to {transform: rotate(360deg); } }
+                .animate-spin {animation: animate-spin 1s linear infinite; }
             `}</style>
-        </div>
+        </div >
     );
 };
 

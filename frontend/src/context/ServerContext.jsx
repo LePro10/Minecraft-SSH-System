@@ -13,6 +13,7 @@ export const ServerProvider = ({ children }) => {
     const [persistentPlayers, setPersistentPlayers] = useState({ whitelist: [], banned: [], cache: [] });
     const [players, setPlayers] = useState([]);
     const [logs, setLogs] = useState([]);
+    const [serverVersion, setServerVersion] = useState(null);
     const [config, setConfig] = useState(() => {
         const saved = localStorage.getItem('mc_config');
         return saved ? JSON.parse(saved) : { path: '/home/mcserver', screenName: 'minecraft' };
@@ -62,6 +63,10 @@ export const ServerProvider = ({ children }) => {
             setIsConnecting(false);
             setIsConnected(false);
             if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        });
+
+        socket.on('server:version', (v) => {
+            setServerVersion(v);
         });
 
         socket.on('config:current', (cfg) => {
@@ -133,6 +138,8 @@ export const ServerProvider = ({ children }) => {
         if (socket) socket.emit('players:refresh');
     };
 
+    const clearLogs = () => setLogs([]);
+
     return (
         <ServerContext.Provider value={{
             stats,
@@ -140,6 +147,7 @@ export const ServerProvider = ({ children }) => {
             players,
             persistentPlayers,
             logs,
+            serverVersion,
             config,
             updateConfig,
             isConnected,
@@ -148,7 +156,8 @@ export const ServerProvider = ({ children }) => {
             connectSSH,
             disconnectSSH,
             startConsole,
-            refreshPlayers
+            refreshPlayers,
+            clearLogs
         }}>
             {children}
         </ServerContext.Provider>

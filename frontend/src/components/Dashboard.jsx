@@ -7,7 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 
 const Dashboard = ({ onNavigate }) => {
     const { socket } = useSocket();
-    const { stats, tps, logs, isConnected, startConsole, players, config } = useServer();
+    const { stats, tps, logs, isConnected, startConsole, players, config, serverVersion, clearLogs } = useServer();
     const [command, setCommand] = useState('');
     const [consoleActive, setConsoleActive] = useState(false);
     const [history, setHistory] = useState([]);
@@ -78,10 +78,21 @@ const Dashboard = ({ onNavigate }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action })
             });
-            if (res.ok) showToast(`Action ${action} initiated.`, 'info');
-            else showToast(`Control failed: ${action}`, 'error');
+            if (res.ok) {
+                showToast(`Action ${action} initiated.`, 'info');
+                if (action === 'start') {
+                    if (clearLogs) clearLogs();
+                    // Give the server a moment to create/access the log file, then refresh console
+                    setTimeout(() => {
+                        if (startConsole) startConsole();
+                    }, 1000);
+                }
+            } else {
+                const errData = await res.json();
+                showToast(`Control failed: ${action}`, 'error', { details: errData.error || 'Unknown error' });
+            }
         } catch (e) {
-            showToast('Host connection lost.', 'error');
+            showToast('Host connection lost.', 'error', { details: e.message });
         }
     };
 
@@ -180,7 +191,7 @@ const Dashboard = ({ onNavigate }) => {
                     <div className="perf-metric">
                         <Fingerprint size={16} />
                         <span className="perf-label">Release:</span>
-                        <span className="uptime-val">SMM v2.5 Stable</span>
+                        <span className="uptime-val">{serverVersion || 'Waiting for log...'}</span>
                     </div>
                 </div>
                 <div className="status-badge" style={{ background: isConnected ? 'rgba(52, 199, 89, 0.2)' : 'rgba(255, 59, 48, 0.2)', color: isConnected ? '#34c759' : '#ff3b30' }}>
@@ -198,9 +209,12 @@ const Dashboard = ({ onNavigate }) => {
                             <h3>Terminal Access</h3>
                         </div>
                         <div className="h-right">
+                            <button className="op-btn info-lite" onClick={() => socket?.emit('console:input', { command: 'list' })} title="List Online Players"><Users size={14} /></button>
+                            <button className="op-btn warning-lite" onClick={() => socket?.emit('console:input', { command: 'tps' })} title="Check Server TPS"><Activity size={14} /></button>
+                            <div className="v-sep-mini" />
                             <button className="op-btn start" onClick={() => control('start')} title="Boot Link"><Play size={14} /></button>
                             <button className="op-btn stop" onClick={() => control('stop')} title="Terminate Link"><Square size={14} /></button>
-                            <button className="op-btn reboot" onClick={() => control('kill')} title="Reset Bridge"><RefreshCw size={14} /></button>
+                            <button className="op-btn reload" onClick={() => control('reload')} title="Reload Server"><RefreshCw size={14} /></button>
                         </div>
                     </div>
                     <div className="console-viewport">
@@ -310,7 +324,10 @@ const Dashboard = ({ onNavigate }) => {
                 .op-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-3px); }
                 .start:hover { color: #34c759; border-color: rgba(52,199,89,0.3); }
                 .stop:hover { color: #ff3b30; border-color: rgba(255,59,48,0.3); }
-                .reboot:hover { color: #007aff; transform: rotate(180deg); }
+                .reload:hover { color: #007aff; transform: rotate(180deg); }
+                .info-lite:hover { color: #64d2ff; border-color: rgba(100,210,255,0.3); }
+                .warning-lite:hover { color: #ffd60a; border-color: rgba(255,214,10,0.3); }
+                .v-sep-mini { width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 4px; }
 
                 .console-viewport { flex: 1; padding: 32px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.8; background: rgba(0,0,0,0.2); scrollbar-width: thin; }
                 .terminal-line { margin-bottom: 8px; color: #d1d5db; position: relative; padding-left: 20px; }

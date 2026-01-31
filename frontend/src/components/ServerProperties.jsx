@@ -259,7 +259,10 @@ const ServerProperties = ({ setDirty }) => {
                 .search-box input { flex: 1; background: transparent; border: none; color: white; outline: none; font-size: 0.95rem; }
                 
                 .properties-scroll { flex: 1; overflow-y: auto; padding-right: 12px; scrollbar-width: thin; }
-                .properties-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 24px; padding-bottom: 40px; }
+                .properties-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; padding-bottom: 40px; }
+                @media (max-width: 1400px) { .properties-grid { grid-template-columns: 1fr 1fr; } }
+                @media (max-width: 900px) { .properties-grid { grid-template-columns: 1fr; } }
+                
                 .prop-section { padding: 28px; }
                 .section-title { display: flex; align-items: center; gap: 15px; border-bottom: 2px solid rgba(255,255,255,0.03); padding-bottom: 15px; margin-bottom: 20px; }
                 .section-icon { color: var(--accent-primary); }
@@ -281,7 +284,7 @@ const ServerProperties = ({ setDirty }) => {
                 .prop-toggle.on .knob { transform: translateX(20px); }
                 
                 .prop-select, .prop-input { min-width: 140px; padding: 8px 12px; font-size: 0.85rem; text-align: right; }
-                .advanced { grid-column: 1 / -1; }
+                .advanced { grid-column: 1 / -1; margin-top: 10px; }
                 .advanced-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
                 @media (max-width: 1100px) { .advanced-grid { grid-template-columns: 1fr; } }
 

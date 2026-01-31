@@ -1,4 +1,6 @@
 const sshService = require('../services/SSHService');
+const path = require('path');
+const fs = require('fs');
 
 class MinecraftController {
     async sendCommand(req, res) {
@@ -114,29 +116,63 @@ class MinecraftController {
             }
 
             const activePath = serverPath || config.path;
-            const screen = config.screenName;
+            const screen = config.screenName || 'minecraft';
 
             if (action === 'start') {
-                await sshService.exec(`cd ${activePath} && screen -dmS ${screen} ${config.startScript}`);
+                const script = config.startScript || 'java -jar server.jar';
+                const isDefault = !config.startScript;
+
+                // Path verification
+                try {
+                    await sshService.exec(`test -d "${activePath}"`);
+                } catch (e) {
+                    throw new Error(`Directory not found: ${activePath}`);
+                }
+
+                if (isDefault) {
+                    console.log(`Starting default server via screen [${screen}] at ${activePath}`);
+                    // Default behavior: screen for interactivity
+                    await sshService.exec(`cd "${activePath}" && screen -dmS ${screen} ${script}`);
+                } else {
+                    console.log(`Executing direct start: ${script} at ${activePath}`);
+                    // Direct execution as requested: "not in the screen"
+                    // Use nohup and & to detach. Redirecting to logs/latest.log
+                    await sshService.exec(`cd "${activePath}" && nohup ${script} >> logs/latest.log 2>&1 &`);
+                }
             } else if (action === 'stop') {
-                // Always send stop command to console, never use script
-                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "stop\\n"`);
+                try {
+                    console.log(`Stopping server ${screen}...`);
+                    const stopCmd = config.stopScript || 'stop';
+                    // If the script is just a word like "stop", send it to console.
+                    // If it's a path like "./stop.sh", execute it? 
+                    // Usually for MC standard is sending "stop" to console.
+                    // valid stop scripts are rare in this context, assuming console command.
+                    await sshService.exec(`screen -S ${screen} -p 0 -X stuff "${stopCmd}\\r"`);
+                } catch (e) {
+                    if (e.message && e.message.includes('No socket match')) {
+                        console.log('Server already stopped (no screen session).');
+                    } else {
+                        throw e;
+                    }
+                }
             } else if (action === 'restart') {
-                // Stop first
-                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "stop\\n"`);
-                // Wait 5 seconds then start
+                try {
+                    await sshService.exec(`screen -S ${screen} -p 0 -X stuff "stop\\r"`);
+                } catch (e) { }
+
                 setTimeout(async () => {
-                    await sshService.exec(`cd ${activePath} && screen -dmS ${screen} ${config.startScript}`);
+                    const script = config.startScript || './run.sh';
+                    await sshService.exec(`cd ${activePath} && screen -dmS ${screen} ${script}`);
                 }, 5000);
             } else if (action === 'kill') {
                 await sshService.exec(`screen -S ${screen} -X quit`);
             } else if (action === 'reload') {
-                // Send reload confirm command to Minecraft console
-                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "reload confirm\\n"`);
+                await sshService.exec(`screen -S ${screen} -p 0 -X stuff "reload confirm\\r"`);
             }
 
             res.json({ success: true });
         } catch (err) {
+            console.error('Control Error:', err.message);
             res.status(500).json({ error: err.message });
         }
     }
