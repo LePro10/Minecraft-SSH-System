@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { File, Folder, ChevronRight, Hash, HardDrive, Plus, Upload, Download, Trash2, Edit3, X, Save, Maximize2, Terminal, Loader2, AlertCircle, FileText, Code, FolderOpen, ArrowLeft } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
-const FileManager = () => {
+const FileManager = ({ setDirty }) => {
     const { config, isConnected } = useServer();
     const [path, setPath] = useState(config?.path || '');
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [editor, setEditor] = useState({ open: false, file: null, content: '', saving: false });
+    const [isDirty, setIsDirty] = useState(false);
     const [selection, setSelection] = useState(new Set());
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        if (setDirty) setDirty(isDirty);
+    }, [isDirty, setDirty]);
 
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -54,6 +61,7 @@ const FileManager = () => {
     const openEditor = async (file) => {
         const filePath = `${path}/${file.name}`.replace(/\/+/g, '/');
         setEditor({ ...editor, open: true, file, content: 'Reading data stream...', saving: false });
+        setIsDirty(false);
         try {
             const res = await fetch(`${API_BASE}/api/files/content?path=${encodeURIComponent(filePath)}`);
             if (res.ok) {
@@ -78,15 +86,24 @@ const FileManager = () => {
                 body: JSON.stringify({ path: filePath, content: editor.content })
             });
             if (res.ok) {
-                // Success
+                setIsDirty(false);
+                showToast('Archive updated successfully.', 'success');
             } else {
-                alert('Buffer write failed.');
+                showToast('Archive write failed.', 'error');
             }
         } catch (e) {
-            alert('Host connection lost.');
+            showToast('Host connection lost.', 'error');
         } finally {
             setEditor(prev => ({ ...prev, saving: false }));
         }
+    };
+
+    const closeEditor = () => {
+        if (isDirty) {
+            if (!window.confirm('You have unsaved changes in the buffer. Discard them?')) return;
+        }
+        setEditor({ ...editor, open: false });
+        setIsDirty(false);
     };
 
     const handleBack = () => {
@@ -185,7 +202,7 @@ const FileManager = () => {
                                     {editor.saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
                                     {editor.saving ? 'Syncing...' : 'Commit Changes'}
                                 </button>
-                                <button className="glass-panel close-action" onClick={() => setEditor({ ...editor, open: false })}><X size={20} /></button>
+                                <button className="glass-panel close-action" onClick={closeEditor}><X size={20} /></button>
                             </div>
                         </div>
 
@@ -196,7 +213,10 @@ const FileManager = () => {
                             <textarea
                                 className="code-textarea"
                                 value={editor.content}
-                                onChange={e => setEditor({ ...editor, content: e.target.value })}
+                                onChange={e => {
+                                    setEditor({ ...editor, content: e.target.value });
+                                    setIsDirty(true);
+                                }}
                                 spellCheck="false"
                                 wrap="off"
                             />
@@ -263,7 +283,7 @@ const FileManager = () => {
 
                 .ed-actions { display: flex; align-items: center; gap: 16px; }
                 .save-action { height: 44px; padding: 0 24px; box-shadow: 0 10px 20px rgba(0,122,255,0.2); }
-                .close-action { width: 44px; height: 44px; cursor: pointer; border: none; }
+                .close-action { width: 44px; height: 44px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; }
 
                 .ed-viewport { flex: 1; display: flex; overflow: hidden; background: #060608; }
                 .ed-liner { width: 60px; background: rgba(0,0,0,0.3); padding: 24px 0; display: flex; flex-direction: column; align-items: flex-end; padding-right: 15px; border-right: 1px solid rgba(255,255,255,0.03); user-select: none; }

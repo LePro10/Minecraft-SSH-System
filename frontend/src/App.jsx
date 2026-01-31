@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import { ServerProvider, useServer } from './context/ServerContext';
+import { ToastProvider } from './context/ToastContext';
+import ToastContainer from './components/ToastContainer';
 import { Activity, Folder, Users, Settings as SettingsIcon, Terminal, Package, Sliders, Hexagon, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
@@ -12,16 +14,40 @@ import Settings from './components/Settings';
 import WelcomeModal from './components/WelcomeModal';
 import './styles/main.css';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{ padding: '40px', color: 'white' }}>Something went wrong. Check console.</div>;
+    }
+    return this.props.children;
+  }
+}
+
 function AppContent() {
   const { connectSSH, updateConfig, isConnected, isConnecting } = useServer();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState('glass');
   const [showWelcome, setShowWelcome] = useState(false);
   const [sshCredentials, setSshCredentials] = useState(null);
+  const [isGlobalDirty, setIsGlobalDirty] = useState(false);
 
   useEffect(() => {
     const visited = localStorage.getItem('hasVisited');
     if (!visited) setShowWelcome(true);
+
+    // Load theme radius
+    const savedRadius = localStorage.getItem('theme_radius') || 'soft';
+    document.documentElement.setAttribute('data-radius', savedRadius);
 
     const loadSettings = async () => {
       try {
@@ -56,22 +82,30 @@ function AppContent() {
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Activity },
-    { id: 'players', label: 'Personnel', icon: Users },
+    { id: 'players', label: 'Players', icon: Users },
     { id: 'files', label: 'Filesystem', icon: Folder },
-    { id: 'plugins', label: 'Extensions', icon: Package },
-    { id: 'properties', label: 'Configuration', icon: Sliders },
-    { id: 'settings', label: 'Core System', icon: SettingsIcon },
+    { id: 'plugins', label: 'Plugins', icon: Package },
+    { id: 'properties', label: 'Server Properties', icon: Sliders },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon },
   ];
+
+  const handleTabChange = (id) => {
+    if (isGlobalDirty) {
+      if (!window.confirm('System detect unsaved changes in progress. Discard modifications?')) return;
+    }
+    setActiveTab(id);
+    setIsGlobalDirty(false);
+  };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
-      case 'files': return <FileManager />;
+      case 'dashboard': return <Dashboard onNavigate={handleTabChange} />;
+      case 'files': return <FileManager setDirty={setIsGlobalDirty} />;
       case 'players': return <PlayerManager />;
       case 'plugins': return <PluginManager />;
-      case 'properties': return <ServerProperties />;
+      case 'properties': return <ServerProperties setDirty={setIsGlobalDirty} />;
       case 'settings': return <Settings theme={theme} setTheme={setTheme} prefill={sshCredentials} />;
-      default: return <Dashboard />;
+      default: return <Dashboard onNavigate={handleTabChange} />;
     }
   };
 
@@ -98,7 +132,7 @@ function AppContent() {
             </div>
             <div className="brand-text">
               <h1>SMM</h1>
-              <p>v2.4 {isConnected ? 'Link Active' : 'Standby'}</p>
+              <p>v2.5 {isConnected ? 'Link Active' : 'Standby'}</p>
             </div>
           </div>
 
@@ -107,7 +141,7 @@ function AppContent() {
               <button
                 key={tab.id}
                 className={`sidebar-link ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
               >
                 <div className="link-content">
                   <tab.icon size={20} className="link-icon" />
@@ -191,14 +225,19 @@ function AppContent() {
   );
 }
 
-function App() {
+const App = () => {
   return (
-    <SocketProvider>
-      <ServerProvider>
-        <AppContent />
-      </ServerProvider>
-    </SocketProvider>
-  )
-}
+    <ErrorBoundary>
+      <SocketProvider>
+        <ServerProvider>
+          <ToastProvider>
+            <AppContent />
+            <ToastContainer />
+          </ToastProvider>
+        </ServerProvider>
+      </SocketProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

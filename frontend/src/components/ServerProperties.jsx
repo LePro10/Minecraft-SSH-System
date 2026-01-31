@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useServer } from '../context/ServerContext';
 import { Save, RefreshCw, Info, Settings, Search, Loader2, AlertCircle, Shield, Globe, Zap, Cpu, Sliders } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
-const ServerProperties = () => {
+const ServerProperties = ({ setDirty }) => {
     const { config, isConnected } = useServer();
     const [properties, setProperties] = useState({});
     const [metadata, setMetadata] = useState({});
@@ -11,6 +12,12 @@ const ServerProperties = () => {
     const [error, setError] = useState(null);
     const [errors, setErrors] = useState({});
     const [filter, setFilter] = useState('');
+    const [isDirty, setIsDirty] = useState(false);
+    const { showToast } = useToast();
+
+    useEffect(() => {
+        if (setDirty) setDirty(isDirty);
+    }, [isDirty, setDirty]);
 
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -27,6 +34,7 @@ const ServerProperties = () => {
             if (res.ok) {
                 setProperties(data.values || {});
                 setMetadata(data.metadata || {});
+                setIsDirty(false);
             } else {
                 setError(data.error || 'Failed to load properties.');
                 setProperties({});
@@ -67,10 +75,11 @@ const ServerProperties = () => {
             });
         }
         setProperties(prev => ({ ...prev, [key]: val }));
+        setIsDirty(true);
     };
 
     const handleSave = async () => {
-        if (Object.keys(errors).length > 0) return alert('Please fix red errors before saving.');
+        if (Object.keys(errors).length > 0) return showToast('Resolve validation errors first.', 'error');
         setSaving(true);
         try {
             const res = await fetch(`${API_BASE}/api/mc/properties`, {
@@ -78,12 +87,14 @@ const ServerProperties = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: config.path, properties })
             });
-            if (res.ok) alert('Settings saved successfully!');
-            else {
+            if (res.ok) {
+                showToast('Engine configuration updated.', 'success');
+                setIsDirty(false);
+            } else {
                 const data = await res.json();
-                alert(`Save Failed: ${data.error}`);
+                showToast(`Sync Failed: ${data.error}`, 'error');
             }
-        } catch (e) { alert('Connection error while saving.'); }
+        } catch (e) { showToast('Uplink lost during sync.', 'error'); }
         finally { setSaving(false); }
     };
 

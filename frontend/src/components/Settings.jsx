@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useSocket } from '../context/SocketContext';
-import { HardDrive, Server, Palette, Loader2, AlertCircle, Upload, Image as ImageIcon, Check } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { HardDrive, Server, Palette, Loader2, AlertCircle, Upload, Image as ImageIcon, Check, MousePointer2, Box } from 'lucide-react';
 
 const Settings = ({ theme, setTheme, prefill }) => {
     const {
@@ -17,8 +18,23 @@ const Settings = ({ theme, setTheme, prefill }) => {
 
     const [mcPath, setMcPath] = useState(config.path);
     const [mcScreen, setMcScreen] = useState(config.screenName);
+    const [mcStart, setMcStart] = useState(config.startScript || './start.sh');
+    const [mcStop, setMcStop] = useState(config.stopScript || 'stop');
+    const [radius, setRadius] = useState(localStorage.getItem('theme_radius') || 'soft');
+    const { showToast } = useToast();
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
+
+    const themes = [
+        { id: 'glass', name: 'Liquid Glass', desc: 'Default vibrant sapphire' },
+        { id: 'coder', name: 'Matrix Coder', desc: 'The hacker console' },
+        { id: 'obsidian', name: 'Obsidian Black', desc: 'High contrast OLED experience' },
+        { id: 'gold', name: 'Gold', desc: 'Premium luxury gold' },
+        { id: 'berry', name: 'Berry', desc: 'Deep purple vibes' },
+        { id: 'slate', name: 'Slate', desc: 'Professional gray' },
+        { id: 'crimson', name: 'Crimson', desc: 'Deep blood red' },
+        { id: 'moss', name: 'Moss', desc: 'Natural organic green' }
+    ];
 
     useEffect(() => {
         setMcPath(config.path);
@@ -61,7 +77,12 @@ const Settings = ({ theme, setTheme, prefill }) => {
 
     const handleConfigSave = (e) => {
         if (e) e.preventDefault();
-        updateConfig({ path: mcPath, screenName: mcScreen });
+        updateConfig({
+            path: mcPath,
+            screenName: mcScreen,
+            startScript: mcStart,
+            stopScript: mcStop
+        });
     };
 
     const updateTheme = async (newTheme) => {
@@ -101,12 +122,6 @@ const Settings = ({ theme, setTheme, prefill }) => {
         }
     };
 
-    const themes = [
-        { id: 'glass', name: 'Liquid Glass', desc: 'Standard semi-transparent aesthetic' },
-        { id: 'forest', name: 'Organic Forest', desc: 'Natural greens and soft rounds' },
-        { id: 'coder', name: 'Terminal Coder', desc: 'Matrix vibes with sharp edges' },
-        { id: 'magma', name: 'Volcanic Magma', desc: 'High contrast heat theme' }
-    ];
 
     return (
         <div className="settings-scroll-container">
@@ -196,6 +211,28 @@ const Settings = ({ theme, setTheme, prefill }) => {
                         ))}
                     </div>
 
+                    <div className="customization-row">
+                        <div className="form-group">
+                            <label><Box size={16} /> Interface Radius</label>
+                            <div className="radius-selector glass-panel">
+                                {['sharp', 'soft', 'round'].map(r => (
+                                    <button
+                                        key={r}
+                                        className={radius === r ? 'active' : ''}
+                                        onClick={() => {
+                                            setRadius(r);
+                                            localStorage.setItem('theme_radius', r);
+                                            document.documentElement.setAttribute('data-radius', r);
+                                            showToast(`Radius set to ${r}`, 'info');
+                                        }}
+                                    >
+                                        {r.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="wallpaper-upload-section">
                         <label>Custom Wallpaper</label>
                         <div className="upload-box glass-panel" onClick={() => fileInputRef.current?.click()}>
@@ -242,13 +279,25 @@ const Settings = ({ theme, setTheme, prefill }) => {
                             <label>Screen Instance Name</label>
                             <input className="glass-input" value={mcScreen} onChange={e => setMcScreen(e.target.value)} />
                         </div>
+                        <div className="form-group-row">
+                            <div className="form-group">
+                                <label>Start Command/Script</label>
+                                <input className="glass-input" value={mcStart} onChange={e => setMcStart(e.target.value)} />
+                                <span className="hint">e.g. ./start.sh or java -jar server.jar</span>
+                            </div>
+                            <div className="form-group">
+                                <label>Stop Command/Script</label>
+                                <input className="glass-input" value={mcStop} onChange={e => setMcStop(e.target.value)} />
+                                <span className="hint">e.g. stop or ./stop.sh</span>
+                            </div>
+                        </div>
                         {saveStatus && (
                             <div className="success-banner">
                                 <Check size={16} />
                                 <span>{saveStatus}</span>
                             </div>
                         )}
-                        <button type="submit" className="glass-button">Update Engine Config</button>
+                        <button type="submit" className="glass-button engine-submit-btn">Update Engine Config</button>
                     </form>
                 </div>
             </div>
@@ -350,9 +399,15 @@ const Settings = ({ theme, setTheme, prefill }) => {
                     right: 10px;
                     background: var(--accent-primary);
                     color: white;
-                    padding: 4px;
+                    width: 24px;
+                    height: 24px;
                     border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
                 }
+
                 .theme-info { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
                 .theme-name { font-weight: 700; color: var(--text-primary); }
                 .theme-desc { font-size: 0.8rem; color: var(--text-secondary); }
@@ -379,19 +434,52 @@ const Settings = ({ theme, setTheme, prefill }) => {
                 .upload-texts .main-text { font-weight: 700; font-size: 1.1rem; }
                 .upload-texts .sub-text { font-size: 0.85rem; color: var(--text-secondary); }
 
-                .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%); }
-                
-                .error-banner {
-                    background: rgba(239, 68, 68, 0.1);
-                    border: 1px solid rgba(239, 68, 68, 0.2);
-                    color: #f87171;
-                    padding: 16px;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    margin-bottom: 24px;
+                .customization-row { margin-top: 32px; }
+                .radius-selector {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr;
+                    padding: 8px;
+                    gap: 8px;
+                    margin-top: 10px;
                 }
+                .radius-selector button {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-secondary);
+                    padding: 10px;
+                    border-radius: 8px;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    letter-spacing: 1px;
+                }
+                .radius-selector button.active {
+                    background: var(--accent-gradient);
+                    color: white;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                }
+
+                .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%); }
+                .form-group-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 24px;
+                    margin-top: 12px;
+                }
+                .engine-submit-btn { margin-top: 32px; width: 100%; }
+
+                .obsidian-preview { background: #000; }
+                .midnight-preview { background: #020617; }
+                .aurora-preview { background: #011c1a; }
+                .cyberpunk-preview { background: #0b0114; }
+                .sakura-preview { background: #1a0b0f; }
+                .gold-preview { background: #12100e; }
+                .berry-preview { background: #120512; }
+                .slate-preview { background: #0f172a; }
+                .crimson-preview { background: #1a0505; }
+                .steel-preview { background: #0d1117; }
+                .moss-preview { background: #111a11; }
 
                 @keyframes animate-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 .animate-spin { animation: animate-spin 1s linear infinite; }
