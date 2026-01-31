@@ -13,8 +13,8 @@ const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/api', apiRoutes);
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 const io = new Server(server, {
     cors: {
@@ -40,7 +40,6 @@ if (fs.existsSync(CONFIG_FILE)) {
     try {
         const data = fs.readFileSync(CONFIG_FILE);
         serverConfig = { ...serverConfig, ...JSON.parse(data) };
-        console.log('Loaded config from file');
     } catch (e) {
         console.error('Error loading config file:', e);
     }
@@ -51,6 +50,36 @@ const saveConfig = () => {
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(serverConfig, null, 2));
     } catch (e) {
         console.error('Error saving config file:', e);
+    }
+};
+
+// Smart Command Executor
+const executeCommand = async (command) => {
+    if (!sshService.connected) throw new Error('SSH not connected');
+
+    // 1. Try Screen Mode first (highly reliable if screen exists)
+    const screen = serverConfig.screenName || 'minecraft';
+    const screenCommand = `screen -S ${screen} -p 0 -X stuff "${command}\\n"`;
+
+    try {
+        // Check if screen exists
+        await sshService.exec(`screen -list | grep "${screen}"`);
+        console.log(`Executing (Screen: ${screen}): ${command}`);
+        await sshService.exec(screenCommand);
+        return { method: 'screen' };
+    } catch (e) {
+        // 2. Fallback to Direct Mode (Pipe) if startScript is configured
+        if (serverConfig.startScript) {
+            console.log(`Executing (Pipe fallback): ${command}`);
+            // Use timeout to prevent hanging on full pipe
+            const pipeCmd = `timeout 2s bash -c 'echo "${command}" > ${serverConfig.path}/.mc_pipe'`;
+            await sshService.exec(pipeCmd).catch(err => {
+                console.warn(`Pipe execution failed or timed out: ${err.message}`);
+                throw new Error('Server not responding (no active screen or working pipe).');
+            });
+            return { method: 'pipe' };
+        }
+        throw new Error(`Execution failed: Screen session "${screen}" not found and no start script configured.`);
     }
 };
 
@@ -65,53 +94,58 @@ sshService.on('close', () => {
     logStream = null;
 });
 
-// Version Persistence
+// Cache for player status
 let lastKnownVersion = null;
+let opList = new Set();
 
 // Log Parsing Logic
 const parseLogForPlayers = (logLine) => {
-    // Regex for: [21:05:10] [Server thread/INFO]: Playername joined the game
-    // Regex for: [21:05:10] [Server thread/INFO]: Playername left the game
-    const tpsMatch = logLine.match(/TPS from last 1m, 5m, 15m: ([\d.]+), ([\d.]+), ([\d.]+)/i);
-    const joinMatch = logLine.match(/: (\w+) joined the game/i);
-    const leaveMatch = logLine.match(/: (\w+) left the game/i);
-    const versionMatch = logLine.match(/Starting minecraft server version (.*)/i) || logLine.match(/This server is running (.*)/i);
+    const lines = logLine.split(/\r?\n/).filter(line => line.trim().length > 0);
 
-    if (versionMatch) {
-        // Clean up version string
-        let v = versionMatch[1];
-        if (v.includes('(MC:')) {
-            const mc = v.match(/\(MC: (.*)\)/);
-            if (mc) v = `Paper ${mc[1]}`;
+    lines.forEach(line => {
+        const tpsMatch = line.match(/TPS from last 1m, 5m, 15m: ([\d.]+), ([\d.]+), ([\d.]+)/i);
+        const joinMatch = line.match(/: (\w+) joined the game/i);
+        const leaveMatch = line.match(/: (\w+) left the game/i);
+        const versionMatch = line.match(/Starting minecraft server version (.*)/i) || line.match(/This server is running (.*)/i);
+
+        if (versionMatch) {
+            let v = versionMatch[1];
+            if (v.includes('(MC:')) {
+                const mc = v.match(/\(MC: (.*)\)/);
+                if (mc) v = `Paper ${mc[1]}`;
+            }
+            lastKnownVersion = v;
+            io.emit('server:version', v);
         }
-        lastKnownVersion = v;
-        io.emit('server:version', v);
-    }
-    const listMatch = logLine.match(/(?:players online|There are \d+ of a max \d+ players online): (.*)/i);
-    const legacyListMatch = logLine.match(/Online players \(\d+\): (.*)/i);
-    const finalMatch = listMatch || legacyListMatch;
 
-    if (tpsMatch) {
-        io.emit('metrics:tps', {
-            t1: parseFloat(tpsMatch[1]),
-            t5: parseFloat(tpsMatch[2]),
-            t15: parseFloat(tpsMatch[3])
-        });
-    } else if (finalMatch) {
-        const names = finalMatch[1].split(', ').map(n => n.split(' ')[0]).filter(n => n && n.length > 0);
-        const playerObjects = names.map(n => ({
-            name: n.trim(),
-            online: true,
-            id: 'un-known-' + Math.random().toString(36).substr(2, 9),
-            ip: '127.0.0.1',
-            op: false,
-        }));
-        io.emit('players:update', playerObjects);
-    } else if (joinMatch || leaveMatch) {
-        // Trigger a 'list' command to get full fresh list
-        const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "list\\n"`;
-        sshService.exec(cmd).catch(() => { });
-    }
+        const listMatch = line.match(/(?:players online|There are \d+ of a max \d+ players online): (.*)/i);
+        const legacyListMatch = line.match(/Online players \(\d+\): (.*)/i);
+        const finalMatch = listMatch || legacyListMatch;
+
+        if (tpsMatch) {
+            io.emit('metrics:tps', {
+                t1: parseFloat(tpsMatch[1]),
+                t5: parseFloat(tpsMatch[2]),
+                t15: parseFloat(tpsMatch[3])
+            });
+        }
+
+        if (finalMatch) {
+            const names = finalMatch[1].split(', ').map(n => n.split(' ')[0]).filter(n => n && n.length > 0);
+            const playerObjects = names.map(n => ({
+                name: n.trim(),
+                online: true,
+                id: 'un-known-' + Math.random().toString(36).substr(2, 9), // Placeholder ID for list entries
+                ip: '127.0.0.1',
+                op: opList.has(n.trim().toLowerCase()),
+            }));
+            console.log(`Players detected: ${playerObjects.map(p => p.name).join(', ')}`);
+            io.emit('players:update', playerObjects);
+        } else if (joinMatch || leaveMatch) {
+            console.log(`Join/Leave detected. Triggering list refresh...`);
+            executeCommand('list').catch(() => { });
+        }
+    });
 };
 
 io.on('connection', (socket) => {
@@ -125,45 +159,11 @@ io.on('connection', (socket) => {
             await sshService.connect(credentials);
             socket.emit('ssh:status', { connected: true });
 
-            // Try to fetch version from files if not known
-            if (!lastKnownVersion) {
-                // Try version.json (common in modpacks/paper layouts)
-                try {
-                    const vData = await sshService.exec(`cat ${serverConfig.path}/version.json`);
-                    const vJson = JSON.parse(vData);
-                    if (vJson.name || vJson.id) {
-                        // Clean up version string
-                        let v = vJson.name || vJson.id;
-                        // Regex to capture "1.21.4" from strings like "Paper version 1.21.4-138-main..." or "git-Paper-138 (MC: 1.21.4)"
-                        // We look for a pattern like 1.X or 1.X.X surrounded by non-digit characters or word boundaries.
-                        const match = v.match(/\b(1\.[0-9]+(\.[0-9]+)?)\b/);
-                        if (match) {
-                            const type = v.toLowerCase().includes('paper') ? 'Paper' : 'Server';
-                            v = `${type} ${match[1]}`; // Result: "Paper 1.21.4"
-                        }
-                        lastKnownVersion = v;
-                        io.emit('server:version', lastKnownVersion);
-                    }
-                } catch (e) { }
-            }
-
             if (pollInterval) clearInterval(pollInterval);
-            let pollCounter = 0;
             pollInterval = setInterval(async () => {
-                if (!sshService.connected) {
-                    clearInterval(pollInterval);
-                    return;
-                }
+                if (!sshService.connected) return clearInterval(pollInterval);
                 const metrics = await sshService.getSystemUsage();
                 io.emit('metrics:update', metrics);
-
-                // Request TPS every 10 seconds (every 2 polls)
-                pollCounter++;
-                if (pollCounter >= 2) {
-                    pollCounter = 0;
-                    const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "tps\\n"`;
-                    sshService.exec(cmd).catch(() => { });
-                }
             }, 5000);
         } catch (err) {
             socket.emit('ssh:error', err.message);
@@ -186,18 +186,10 @@ io.on('connection', (socket) => {
     socket.on('console:start', async () => {
         try {
             if (!sshService.connected) throw new Error('SSH not connected');
-            if (logStream) {
-                try { logStream.destroy(); } catch (e) { }
-                logStream = null;
-            }
 
-            const logDir = `${serverConfig.path}/logs`;
-            const logPath = `${logDir}/latest.log`;
+            const logPath = `${serverConfig.path}/logs/latest.log`;
+            await sshService.exec(`mkdir -p ${serverConfig.path}/logs && touch ${logPath}`).catch(() => { });
 
-            // Ensure directory and file exist so tail doesn't immediately fail
-            await sshService.exec(`mkdir -p ${logDir} && touch ${logPath}`).catch(() => { });
-
-            // Use -F to track by filename (handles rotation/re-creation on server start)
             const command = `tail -F -n 100 ${logPath}`;
             const stream = await sshService.spawn(command);
             logStream = stream;
@@ -217,13 +209,13 @@ io.on('connection', (socket) => {
                 logStream = null;
             });
 
-            // Initial player list
-            const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "list\\n"`;
-            sshService.exec(cmd).catch(() => { });
-
-            // Fetch permanent lists
+            // Initial refresh of lists
             const data = await fetchPersistentPlayers();
             socket.emit('players:data_update', data);
+
+            // Trigger first list refresh
+            executeCommand('list').catch(() => { });
+
         } catch (err) {
             socket.emit('console:error', err.message);
         }
@@ -232,6 +224,15 @@ io.on('connection', (socket) => {
     const fetchPersistentPlayers = async () => {
         if (!sshService.connected) return {};
         const base = serverConfig.path;
+
+        try {
+            const opsContent = await sshService.exec(`cat ${base}/ops.json`);
+            const ops = JSON.parse(opsContent);
+            opList = new Set();
+            ops.forEach(o => { if (o.name) opList.add(o.name.toLowerCase()); });
+            console.log(`Updated opList: ${Array.from(opList).join(', ')}`);
+        } catch (e) { }
+
         const files = [
             { name: 'whitelist', path: `${base}/whitelist.json` },
             { name: 'banned', path: `${base}/banned-players.json` },
@@ -242,7 +243,18 @@ io.on('connection', (socket) => {
         for (const f of files) {
             try {
                 const content = await sshService.exec(`cat ${f.path}`);
-                results[f.name] = JSON.parse(content);
+                let list = JSON.parse(content);
+
+                // Attach OP status to any player objects
+                if (f.name === 'cache' || f.name === 'whitelist' || f.name === 'banned') {
+                    list = list.map(p => ({
+                        ...p,
+                        name: p.name || p.username,
+                        op: opList.has((p.name || p.username || "").toLowerCase())
+                    }));
+                }
+
+                results[f.name] = list;
             } catch (e) {
                 results[f.name] = [];
             }
@@ -257,32 +269,8 @@ io.on('connection', (socket) => {
 
     socket.on('console:input', async ({ command }) => {
         try {
-            if (!sshService.connected) {
-                socket.emit('console:log', '\n[System] SSH not connected.\n');
-                return;
-            }
-
-            // Step 1: Check if screen session exists (only if no start script is used, or as a warning)
-            if (!serverConfig.startScript) {
-                const checkSession = `screen -list | grep "${serverConfig.screenName}"`;
-                try {
-                    await sshService.exec(checkSession);
-                } catch (e) {
-                    socket.emit('console:log', `\n[System Warning] Screen session "${serverConfig.screenName}" not found. If running in direct mode, please note that command input is currently disabled.\n`);
-                    return;
-                }
-            }
-
-            // Step 2: Execute command
-            if (serverConfig.startScript) {
-                socket.emit('console:log', `\n[System] Command Input is currently disabled in Direct Mode (non-screen). Please use screen mode for interactivity.\n`);
-            } else {
-                console.log(`Executing in screen "${serverConfig.screenName}": ${command}`);
-                const cmd = `screen -S ${serverConfig.screenName} -p 0 -X stuff "${command}\\n"`;
-                await sshService.exec(cmd);
-            }
+            await executeCommand(command);
         } catch (err) {
-            console.error('Console error:', err.message);
             socket.emit('console:log', `\n[System Error] ${err.message}\n`);
         }
     });
@@ -294,5 +282,6 @@ io.on('connection', (socket) => {
 
 const PORT = 3001;
 server.listen(PORT, () => {
-    console.log(`Backend: Running on port ${PORT}`);
+    console.log(`Backend [v3.0.6]: Running on port ${PORT}`);
+    console.log(`Working Directory: ${process.cwd()}`);
 });
