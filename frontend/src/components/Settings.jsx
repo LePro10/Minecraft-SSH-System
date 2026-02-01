@@ -2,8 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useSocket } from '../context/SocketContext';
 import { useToast } from '../context/ToastContext';
-import { HardDrive, Server, Palette, Loader2, AlertCircle, Upload, Image as ImageIcon, Check, MousePointer2, Box, PenTool } from 'lucide-react';
+import { HardDrive, Server, Palette, Loader2, AlertCircle, Upload, Image as ImageIcon, Check, MousePointer2, Box, PenTool, GripVertical } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 
 const Settings = ({ theme, setTheme, prefill }) => {
@@ -26,6 +31,29 @@ const Settings = ({ theme, setTheme, prefill }) => {
     const { showToast } = useToast();
     const [saveStatus, setSaveStatus] = useState(null);
     const { socket } = useSocket();
+
+    const defaultLayouts = {
+        lg: [
+            { i: 'connection', x: 0, y: 0, w: 12, h: 14 },
+            { i: 'personalization', x: 0, y: 14, w: 12, h: 10 },
+            { i: 'engine', x: 0, y: 24, w: 12, h: 12 },
+        ],
+        md: [
+            { i: 'connection', x: 0, y: 0, w: 12, h: 14 },
+            { i: 'personalization', x: 0, y: 14, w: 12, h: 10 },
+            { i: 'engine', x: 0, y: 24, w: 12, h: 12 },
+        ]
+    };
+
+    const [layouts, setLayouts] = useState(() => {
+        const saved = localStorage.getItem('settings_layout');
+        return saved ? JSON.parse(saved) : defaultLayouts;
+    });
+
+    const onLayoutChange = (currentLayout, allLayouts) => {
+        setLayouts(allLayouts);
+        localStorage.setItem('settings_layout', JSON.stringify(allLayouts));
+    };
 
 
 
@@ -102,184 +130,191 @@ const Settings = ({ theme, setTheme, prefill }) => {
 
 
     return (
-        <div className="h-full overflow-y-auto px-4 pb-20 scrollbar-thin scrollbar-thumb-white/10">
-
-
-            <div className="max-w-4xl mx-auto flex flex-col gap-12 py-10">
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin scrollbar-thumb-white/10">
+            <ResponsiveGridLayout
+                className="layout"
+                layouts={layouts}
+                breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+                cols={{ lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 }}
+                rowHeight={40}
+                margin={[16, 16]}
+                onLayoutChange={onLayoutChange}
+                draggableHandle=".cursor-grab"
+                isDraggable={true}
+                isResizable={true}
+            >
                 {/* Connection Section */}
-                <div className="liquid-card p-10 flex flex-col gap-8">
-                    <div className="flex gap-6 items-center border-b border-white/5 pb-8">
+                <div key="connection" className="liquid-card p-10 flex flex-col gap-8">
+                    <div className="flex gap-6 items-center border-b border-white/5 pb-8 cursor-grab active:cursor-grabbing">
                         <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
                             <Server size={28} />
                         </div>
                         <div>
                             <h3 className="text-2xl font-black text-white tracking-tight">Server Connection</h3>
-                            <p className="text-white/60 font-medium mt-1">Manage your SSH credentials and connection status.</p>
+                            <p className="text-white/60 font-medium mt-1">Manage SSH credentials.</p>
                         </div>
+                        <div className="ml-auto opacity-20"><GripVertical size={20} /></div>
                     </div>
 
-                    {lastError && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-center gap-3 font-bold">
-                            <AlertCircle size={20} />
-                            <span>{lastError}</span>
-                        </div>
-                    )}
-
-                    <form onSubmit={handleConnect} className="flex flex-col gap-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Host Address</label>
-                                <input className="liquid-input font-mono" value={sshConfig.host} onChange={e => setSshConfig({ ...sshConfig, host: e.target.value })} placeholder="127.0.0.1" />
+                    <div onMouseDown={e => e.stopPropagation()} className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
+                        {lastError && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-center gap-3 font-bold mb-6">
+                                <AlertCircle size={20} />
+                                <span>{lastError}</span>
                             </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Port</label>
-                                <input className="liquid-input font-mono" type="number" value={sshConfig.port} onChange={e => setSshConfig({ ...sshConfig, port: parseInt(e.target.value) })} />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Username</label>
-                                <input className="liquid-input font-mono" value={sshConfig.username} onChange={e => setSshConfig({ ...sshConfig, username: e.target.value })} placeholder="root" />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Password</label>
-                                <input className="liquid-input font-mono" type="password" value={sshConfig.password} onChange={e => setSshConfig({ ...sshConfig, password: e.target.value })} />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Private Key (Optional)</label>
-                            <textarea
-                                value={sshConfig.privateKey || ''}
-                                onChange={e => setSshConfig({ ...sshConfig, privateKey: e.target.value })}
-                                placeholder="-----BEGIN RSA PRIVATE KEY-----..."
-                                className="liquid-input font-mono text-xs h-32 resize-none"
-                            />
-                        </div>
-
-                        {isConnected ? (
-                            <button type="button" onClick={handleDisconnect} className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-red-600 to-orange-600 shadow-lg shadow-red-600/20 text-white hover:scale-[1.01] transition-transform">Disconnect Server</button>
-                        ) : (
-                            <button type="submit" className={`w-full py-4 rounded-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-600/20 text-white hover:scale-[1.01] transition-transform flex items-center justify-center gap-2 ${isConnecting ? 'opacity-70 cursor-wait' : ''}`} disabled={isConnecting}>
-                                {isConnecting ? <><Loader2 className="animate-spin" size={20} /> Connecting...</> : 'Connect SSH'}
-                            </button>
                         )}
-                    </form>
+
+                        <form onSubmit={handleConnect} className="flex flex-col gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Host Address</label>
+                                    <input className="liquid-input font-mono" value={sshConfig.host} onChange={e => setSshConfig({ ...sshConfig, host: e.target.value })} placeholder="127.0.0.1" />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Port</label>
+                                    <input className="liquid-input font-mono" type="number" value={sshConfig.port} onChange={e => setSshConfig({ ...sshConfig, port: parseInt(e.target.value) })} />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Username</label>
+                                    <input className="liquid-input font-mono" value={sshConfig.username} onChange={e => setSshConfig({ ...sshConfig, username: e.target.value })} placeholder="root" />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">SSH Password</label>
+                                    <input className="liquid-input font-mono" type="password" value={sshConfig.password} onChange={e => setSshConfig({ ...sshConfig, password: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Private Key (Optional)</label>
+                                <textarea
+                                    value={sshConfig.privateKey || ''}
+                                    onChange={e => setSshConfig({ ...sshConfig, privateKey: e.target.value })}
+                                    className="liquid-input font-mono text-xs h-32 resize-none"
+                                />
+                            </div>
+                            {isConnected ? (
+                                <button type="button" onClick={handleDisconnect} className="w-full py-4 rounded-xl font-bold bg-gradient-to-r from-red-600 to-orange-600 shadow-lg shadow-red-600/20 text-white hover:scale-[1.01] transition-transform">Disconnect Server</button>
+                            ) : (
+                                <button type="submit" className={`w-full py-4 rounded-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-600/20 text-white hover:scale-[1.01] transition-transform flex items-center justify-center gap-2 ${isConnecting ? 'opacity-70 cursor-wait' : ''}`} disabled={isConnecting}>
+                                    {isConnecting ? <><Loader2 className="animate-spin" size={20} /> Connecting...</> : 'Connect SSH'}
+                                </button>
+                            )}
+                        </form>
+                    </div>
                 </div>
 
                 {/* Theme Section */}
-                <div className="liquid-card p-10 flex flex-col gap-8">
-                    <div className="flex gap-6 items-center border-b border-white/5 pb-8 justify-between">
-                        <div className="flex gap-6 items-center">
-                            <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
-                                <Palette size={28} />
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-black text-white tracking-tight">Personalization</h3>
-                                <p className="text-white/60 font-medium mt-1">Customize your immersive environment.</p>
-                            </div>
+                <div key="personalization" className="liquid-card p-10 flex flex-col gap-8">
+                    <div className="flex gap-6 items-center border-b border-white/5 pb-8 cursor-grab active:cursor-grabbing">
+                        <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+                            <Palette size={28} />
                         </div>
+                        <div>
+                            <h3 className="text-2xl font-black text-white tracking-tight">Personalization</h3>
+                            <p className="text-white/60 font-medium mt-1">Immersive environment.</p>
+                        </div>
+                        <div className="ml-auto opacity-20"><GripVertical size={20} /></div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {themes.map(t => (
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                key={t.id}
-                                className={`group relative p-4 rounded-xl border flex flex-col items-center gap-3 transition-all cursor-pointer overflow-hidden ${theme === t.id ? 'bg-white/10 border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-black/20 border-white/5 hover:bg-white/5'
-                                    }`}
-                                onClick={() => updateTheme(t.id)}
-                            >
-                                <div
-                                    className={`w-16 h-16 rounded-full shadow-inner ${t.id === 'glass' ? 'bg-gradient-to-br from-blue-900 to-black' :
-                                        t.id === 'sakura' ? 'bg-gradient-to-br from-pink-500 to-rose-900' :
-                                            t.id === 'gold' ? 'bg-gradient-to-br from-yellow-700 to-yellow-900' :
-                                                t.id === 'forest' ? 'bg-gradient-to-br from-green-600 to-green-900' :
-                                                    t.id === 'nebula' ? 'bg-gradient-to-br from-purple-600 to-indigo-900' :
-                                                        t.id === 'sunset' ? 'bg-gradient-to-br from-orange-500 to-red-900' :
-                                                            'bg-gray-900'
+                    <div onMouseDown={e => e.stopPropagation()} className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                            {themes.map(t => (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    key={t.id}
+                                    className={`group relative p-4 rounded-xl border flex flex-col items-center gap-3 transition-all cursor-pointer overflow-hidden ${theme === t.id ? 'bg-white/10 border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'bg-black/20 border-white/5 hover:bg-white/5'
                                         }`}
-                                />
-                                <div className="text-center">
-                                    <div className="font-bold text-white text-sm">{t.name}</div>
-                                    <div className="text-[10px] text-white/40 uppercase tracking-wider">{t.desc.split(' ')[0]}</div>
-                                </div>
-                                {theme === t.id && <div className="absolute top-2 right-2 text-blue-400"><Check size={16} /></div>}
-                            </motion.button>
-                        ))}
-                    </div>
-
-                    <div className="pt-8 border-t border-white/5">
-                        <label className="flex items-center gap-2 mb-4 font-bold text-white/60 uppercase tracking-widest text-xs"><Box size={16} /> Interface Radius</label>
-                        <div className="grid grid-cols-3 gap-2 bg-black/20 p-2 rounded-xl border border-white/5">
-                            {['sharp', 'soft', 'round'].map(r => (
-                                <button
-                                    key={r}
-                                    className={`py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${radius === r
-                                        ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg'
-                                        : 'text-white/40 hover:text-white hover:bg-white/5'
-                                        }`}
-                                    onClick={() => {
-                                        setRadius(r);
-                                        localStorage.setItem('theme_radius', r);
-                                        document.documentElement.setAttribute('data-radius', r);
-                                        showToast(`Radius set to ${r}`, 'info');
-                                    }}
+                                    onClick={() => updateTheme(t.id)}
                                 >
-                                    {r}
-                                </button>
+                                    <div
+                                        className={`w-12 h-12 rounded-full shadow-inner ${t.id === 'glass' ? 'bg-gradient-to-br from-blue-900 to-black' :
+                                            t.id === 'sakura' ? 'bg-gradient-to-br from-pink-500 to-rose-900' :
+                                                t.id === 'gold' ? 'bg-gradient-to-br from-yellow-700 to-yellow-900' :
+                                                    t.id === 'forest' ? 'bg-gradient-to-br from-green-600 to-green-900' :
+                                                        t.id === 'nebula' ? 'bg-gradient-to-br from-purple-600 to-indigo-900' :
+                                                            t.id === 'sunset' ? 'bg-gradient-to-br from-orange-500 to-red-900' :
+                                                                'bg-gray-900'
+                                            }`}
+                                    />
+                                    <div className="text-center">
+                                        <div className="font-bold text-white text-xs">{t.name}</div>
+                                    </div>
+                                    {theme === t.id && <div className="absolute top-2 right-2 text-blue-400"><Check size={16} /></div>}
+                                </motion.button>
                             ))}
+                        </div>
+
+                        <div className="pt-8 border-t border-white/5">
+                            <label className="flex items-center gap-2 mb-4 font-bold text-white/60 uppercase tracking-widest text-[10px]"><Box size={14} /> Interface Radius</label>
+                            <div className="grid grid-cols-3 gap-2 bg-black/20 p-2 rounded-xl border border-white/5">
+                                {['sharp', 'soft', 'round'].map(r => (
+                                    <button
+                                        key={r}
+                                        className={`py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all ${radius === r
+                                            ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg'
+                                            : 'text-white/40 hover:text-white hover:bg-white/5'
+                                            }`}
+                                        onClick={() => {
+                                            setRadius(r);
+                                            localStorage.setItem('theme_radius', r);
+                                            document.documentElement.setAttribute('data-radius', r);
+                                            showToast(`Radius set to ${r}`, 'info');
+                                        }}
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Engine Config */}
-                <div className="liquid-card p-10 flex flex-col gap-8">
-                    <div className="flex gap-6 items-center border-b border-white/5 pb-8">
+                <div key="engine" className="liquid-card p-10 flex flex-col gap-8">
+                    <div className="flex gap-6 items-center border-b border-white/5 pb-8 cursor-grab active:cursor-grabbing">
                         <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                             <HardDrive size={28} />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-black text-white tracking-tight">Server Engine Path</h3>
-                            <p className="text-white/60 font-medium mt-1">Technical parameters for the Minecraft process.</p>
+                            <h3 className="text-2xl font-black text-white tracking-tight">Server Engine</h3>
+                            <p className="text-white/60 font-medium mt-1">Technical parameters.</p>
                         </div>
+                        <div className="ml-auto opacity-20"><GripVertical size={20} /></div>
                     </div>
 
-                    <form onSubmit={handleConfigSave} className="flex flex-col gap-6">
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Base Server Directory</label>
-                            <input className="liquid-input font-mono" value={mcPath} onChange={e => setMcPath(e.target.value)} placeholder="/home/user/mcserver" />
-                            <span className="text-[10px] text-white/30 font-medium ml-1">Absolute path where your server files are located.</span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div onMouseDown={e => e.stopPropagation()} className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
+                        <form onSubmit={handleConfigSave} className="flex flex-col gap-6">
                             <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Screen Instance Name</label>
-                                <input className="liquid-input font-mono" value={mcScreen} onChange={e => setMcScreen(e.target.value)} placeholder="minecraft" />
+                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Base Directory</label>
+                                <input className="liquid-input font-mono" value={mcPath} onChange={e => setMcPath(e.target.value)} placeholder="/home/user/mcserver" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Screen Name</label>
+                                    <input className="liquid-input font-mono" value={mcScreen} onChange={e => setMcScreen(e.target.value)} placeholder="minecraft" />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Start Script</label>
+                                    <input className="liquid-input font-mono" value={mcStart} onChange={e => setMcStart(e.target.value)} placeholder="java -jar server.jar" />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Start Command (Optional)</label>
-                                <input className="liquid-input font-mono" value={mcStart} onChange={e => setMcStart(e.target.value)} placeholder="java -jar server.jar" />
+                                <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Stop Command</label>
+                                <input className="liquid-input font-mono" value={mcStop} onChange={e => setMcStop(e.target.value)} placeholder="stop" />
                             </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold uppercase tracking-widest text-white/40 ml-1">Stop Command</label>
-                            <input className="liquid-input font-mono" value={mcStop} onChange={e => setMcStop(e.target.value)} placeholder="stop" />
-                        </div>
-
-                        {saveStatus && (
-                            <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-xl flex items-center gap-3 font-bold text-sm animate-pulse">
-                                <Check size={16} />
-                                <span>{saveStatus}</span>
-                            </div>
-                        )}
-
-                        <button type="submit" className="w-full py-4 rounded-xl font-bold border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors uppercase tracking-widest text-xs">
-                            Update Engine Configuration
-                        </button>
-                    </form>
+                            {saveStatus && (
+                                <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-xl flex items-center gap-3 font-bold text-sm">
+                                    <Check size={16} />
+                                    <span>{saveStatus}</span>
+                                </div>
+                            )}
+                            <button type="submit" className="w-full py-4 rounded-xl font-bold border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors uppercase tracking-widest text-xs">
+                                Update Configuration
+                            </button>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            </ResponsiveGridLayout>
         </div>
     );
 };

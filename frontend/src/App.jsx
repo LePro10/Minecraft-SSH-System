@@ -169,8 +169,7 @@ function AppContent() {
         <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full mix-blend-screen animate-pulse-slow" style={{ backgroundColor: 'var(--blob-color-1)', filter: 'blur(120px)' }} />
         <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full mix-blend-screen animate-pulse-slow" style={{ backgroundColor: 'var(--blob-color-2)', animationDelay: '2s', filter: 'blur(150px)' }} />
 
-        {/* Grain/Noise Overlay */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
+
       </div>
 
       {showWelcome && (
@@ -249,14 +248,14 @@ function AppContent() {
         </motion.aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 h-full min-w-0 relative z-10 perspective-1000">
+        <main className="flex-1 h-full min-w-0 relative z-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 20, rotateX: -2, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, rotateX: 2, scale: 0.98, filter: 'blur(10px)' }}
-              transition={{ duration: 0.5, ease: [0.25, 0.8, 0.25, 1] }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99, filter: 'blur(10px)' }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="w-full h-full"
             >
               {renderContent()}
