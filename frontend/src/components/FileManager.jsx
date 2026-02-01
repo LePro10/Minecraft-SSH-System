@@ -364,25 +364,79 @@ const FileManager = () => {
                 {/* Editor Modal */}
                 <AnimatePresence>
                     {editor && (
-                        <motion.div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-xl p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                            <motion.div className="liquid-card w-full h-full max-w-6xl flex flex-col overflow-hidden shadow-2xl border border-white/10" initial={{ scale: 0.95 }} animate={{ scale: 1 }}>
-                                <div className="flex items-center justify-between p-4 bg-white/[0.02] border-b border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><Code size={20} /></div>
-                                        <span className="font-mono text-sm text-white/70">{editor.path}</span>
-                                        {editor.content !== editor.original && <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold uppercase">Unsaved</span>}
+                        <motion.div
+                            className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-12 md:p-20"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                        >
+                            {/* Backdrop blur with high index */}
+                            <motion.div
+                                className="absolute inset-0 bg-black/60 backdrop-blur-[20px] saturate-[180%]"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => setEditor(null)}
+                            />
+
+                            <motion.div
+                                className="liquid-card w-full h-full max-w-7xl flex flex-col overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-white/10 relative z-10"
+                                style={{ background: 'var(--bg-panel)' }}
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                            >
+                                <div className="flex items-center justify-between p-5 bg-white/[0.03] border-b border-white/5 backdrop-blur-md">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-400 shadow-inner">
+                                            <Code size={20} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-white/30 truncate max-w-[300px]">Node FS // {editor.path}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-white/90">{editor.path.split('/').pop()}</span>
+                                                {editor.content !== editor.original && (
+                                                    <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,44,44,0.5)] animate-pulse" />
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <button id="save-btn" className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors shadow-lg shadow-blue-600/20" onClick={saveEditor}>Save Changes</button>
-                                        <button className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-white transition-colors" onClick={() => setEditor(null)}><X size={20} /></button>
+                                    <div className="flex items-center gap-4">
+                                        {editor.content !== editor.original && (
+                                            <span className="hidden md:block text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
+                                                Unsaved Delta
+                                            </span>
+                                        )}
+                                        <button
+                                            id="save-btn"
+                                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 active:scale-95 flex items-center gap-2"
+                                            onClick={saveEditor}
+                                        >
+                                            <Save size={16} /> Save Changes
+                                        </button>
+                                        <button
+                                            className="p-2.5 hover:bg-white/10 rounded-xl text-white/30 hover:text-white transition-all border border-transparent hover:border-white/10"
+                                            onClick={() => setEditor(null)}
+                                        >
+                                            <X size={20} />
+                                        </button>
                                     </div>
                                 </div>
-                                <textarea
-                                    className="flex-1 bg-black/30 border-none p-6 text-white font-mono text-sm leading-relaxed outline-none resize-none"
-                                    value={editor.content}
-                                    onChange={e => setEditor({ ...editor, content: e.target.value })}
-                                    spellCheck={false}
-                                />
+                                <div className="flex-1 relative overflow-hidden group">
+                                    {/* Sub-glass layer for the actual textarea */}
+                                    <div className="absolute inset-0 bg-black/20 z-0" />
+                                    <textarea
+                                        className="relative z-10 w-full h-full bg-transparent p-10 text-white font-mono text-[13px] leading-relaxed outline-none resize-none scrollbar-thin scrollbar-thumb-white/10 selection:bg-blue-500/30"
+                                        value={editor.content}
+                                        onChange={e => setEditor({ ...editor, content: e.target.value })}
+                                        spellCheck={false}
+                                        autoFocus
+                                    />
+                                    {/* Editor UI Accents */}
+                                    <div className="absolute bottom-6 right-6 z-20 flex gap-4 text-[10px] font-mono text-white/20 select-none bg-black/40 px-4 py-2 rounded-lg border border-white/5 backdrop-blur-md">
+                                        <span>UTF-8</span>
+                                        <span>LN {editor.content.split('\n').length}</span>
+                                        <span>CH {editor.content.length}</span>
+                                    </div>
+                                </div>
                             </motion.div>
                         </motion.div>
                     )}

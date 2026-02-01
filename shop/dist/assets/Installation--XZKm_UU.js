@@ -1,0 +1,16 @@
+import{c as t,r,j as e,T as o}from"./index-DlRQoB4a.js";import{G as d}from"./GlowCard-Rmnz7HU4.js";/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const m=t("Check",[["path",{d:"M20 6 9 17l-5-5",key:"1gmf2c"}]]);/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const h=t("Copy",[["rect",{width:"14",height:"14",x:"8",y:"8",rx:"2",ry:"2",key:"17jyea"}],["path",{d:"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",key:"zix9uf"}]]);/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const s=t("Download",[["path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}],["polyline",{points:"7 10 12 15 17 10",key:"2ggqvy"}],["line",{x1:"12",x2:"12",y1:"15",y2:"3",key:"1vk2je"}]]),b=()=>{const[a,l]=r.useState(!1),i="curl -sL smm.sh | bash",n=()=>{navigator.clipboard.writeText(i),l(!0),setTimeout(()=>l(!1),2e3)};return e.jsx("section",{className:"py-32 px-6",children:e.jsxs("div",{className:"container mx-auto max-w-4xl",children:[e.jsxs("div",{className:"text-center mb-16",children:[e.jsx("h2",{className:"text-4xl md:text-6xl font-black italic tracking-tighter mb-6",children:"Zero Friction."}),e.jsx("p",{className:"text-white/40 font-light max-w-xl mx-auto italic",children:"Deploy your entire management ecosystem with a single command."})]}),e.jsxs(d,{className:"p-10 border-white/5 bg-black/60 shadow-2xl",children:[e.jsxs("div",{className:"flex items-center justify-between mb-8",children:[e.jsxs("div",{className:"flex gap-2",children:[e.jsx("div",{className:"w-3 h-3 rounded-full bg-red-500/30"}),e.jsx("div",{className:"w-3 h-3 rounded-full bg-yellow-500/30"}),e.jsx("div",{className:"w-3 h-3 rounded-full bg-green-500/30"})]}),e.jsxs("div",{className:"text-[10px] font-black uppercase tracking-[0.2em] text-white/20 flex items-center gap-2",children:[e.jsx(o,{size:12})," BASH SESSION"]})]}),e.jsxs("div",{className:"flex flex-col md:flex-row items-center gap-6 bg-white/[0.02] p-6 rounded-2xl border border-white/5",children:[e.jsxs("div",{className:"flex-1 font-mono text-sm md:text-lg tracking-tight flex items-center gap-4",children:[e.jsx("span",{className:"text-blue-500 font-black",children:"$"}),e.jsx("span",{className:"text-white/80",children:i})]}),e.jsxs("button",{onClick:n,className:"btn-buy py-3 px-6 text-xs flex items-center gap-2",children:[a?e.jsx(m,{size:14}):e.jsx(h,{size:14}),a?"COPIED":"COPY INSTALL"]})]}),e.jsx("div",{className:"mt-10 grid grid-cols-3 gap-6",children:[{label:"Download",val:"12 MB",icon:e.jsx(s,{size:14})},{label:"Setup Time",val:"~15 Sec",icon:e.jsx(s,{size:14})},{label:"Encryption",val:"Enabled",icon:e.jsx(s,{size:14})}].map((c,x)=>e.jsxs("div",{className:"text-center",children:[e.jsx("div",{className:"text-[9px] font-black uppercase text-white/20 tracking-widest mb-1",children:c.label}),e.jsx("div",{className:"text-sm font-black text-white/60",children:c.val})]},x))})]})]})})};export{b as default};
