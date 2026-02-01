@@ -1,273 +1,247 @@
 import React, { useState, useEffect } from 'react';
 import { useServer } from '../context/ServerContext';
 import { useToast } from '../context/ToastContext';
-import { Search, Download, Star, ExternalLink, Loader2, CheckCircle, Package, ArrowRight, AlertCircle, Trash2, Filter, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, Loader2, AlertCircle, Package, Filter, Sparkles, ArrowRight, ExternalLink, CheckCircle, Trash2, RefreshCw, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PluginManager = () => {
-    const { config, isConnected } = useServer();
+    const { isConnected, config } = useServer();
+    const { showToast } = useToast();
     const [plugins, setPlugins] = useState([]);
     const [installed, setInstalled] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [installing, setInstalling] = useState(null);
-    const [uninstalling, setUninstalling] = useState(null);
     const [page, setPage] = useState(1);
-    const [showInstalledOnly, setShowInstalledOnly] = useState(false);
+    const [total, setTotal] = useState(0);
 
     const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const { showToast } = useToast();
 
-    const fetchPlugins = async (query = '', p = 1) => {
+    useEffect(() => {
+        if (isConnected) {
+            fetchInstalled();
+            fetchPlugins();
+        }
+    }, [isConnected, search, page]);
+
+    const fetchPlugins = async () => {
         setLoading(true);
-        setError(null);
         try {
-            const res = await fetch(`${API_BASE}/api/plugins/search?query=${encodeURIComponent(query)}&page=${p}`);
+            const res = await fetch(`${API_BASE}/api/plugins/search?query=${encodeURIComponent(search)}&page=${page}`);
             const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'The plugin store is temporarily unavailable.');
-            }
-
-            if (Array.isArray(data)) {
-                if (p === 1) setPlugins(data);
-                else setPlugins(prev => [...prev, ...data]);
-            } else {
-                setPlugins([]);
-            }
+            setPlugins(data.results || []);
+            setTotal(data.total || 0);
         } catch (e) {
-            console.error('Plugin search error:', e);
-            setError(e.message.includes('Failed to fetch') ? 'Cannot connect to the backend server. Is it running?' : e.message);
+            showToast('Failed to fetch store plugins', 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const fetchInstalled = async () => {
-        if (!isConnected) return;
         try {
-            const res = await fetch(`${API_BASE}/api/plugins/installed?serverPath=${encodeURIComponent(config.path)}`);
-            if (res.ok) {
-                const data = await res.json();
-                setInstalled(Array.isArray(data) ? data : []);
-            }
-        } catch (e) { console.error('Error fetching installed plugins:', e); }
-    };
-
-    useEffect(() => {
-        fetchPlugins('', 1);
-        if (isConnected) fetchInstalled();
-    }, [isConnected, config.path]);
-
-    const triggerReload = async () => {
-        try {
-            await fetch(`${API_BASE}/api/mc/control`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'reload' })
-            });
-            showToast('Reload signal sent.', 'info');
+            const res = await fetch(`${API_BASE}/api/plugins/installed?path=${encodeURIComponent(config.path)}`);
+            const data = await res.json();
+            setInstalled(data || []);
         } catch (e) {
-            showToast('Failed to trigger reload.', 'error');
+            console.error('Failed to fetch installed plugins');
         }
     };
 
     const handleInstall = async (plugin) => {
-        if (!isConnected) return showToast('Establish SSH link first.', 'error');
-        setInstalling(plugin.id);
         try {
+            showToast(`Installing ${plugin.name}...`, 'info');
             const res = await fetch(`${API_BASE}/api/plugins/install`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    resourceId: plugin.id,
-                    resourceName: plugin.name,
-                    serverPath: config.path
+                    url: plugin.downloadUrl,
+                    name: plugin.name + '.jar',
+                    path: config.path
                 })
             });
-            const data = await res.json();
             if (res.ok) {
-                showToast(`${plugin.name} integrated. Reload required.`, 'success', {
-                    label: 'Reload Server',
-                    onClick: () => triggerReload()
-                });
+                showToast('Installed successfully!', 'success');
                 fetchInstalled();
-            } else showToast(`Download failed: ${data.error}`, 'error');
-        } catch (e) { showToast('Spiget downlink interrupted.', 'error'); }
-        finally { setInstalling(null); }
+            } else {
+                showToast('Installation failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error during installation', 'error');
+        }
     };
 
-    const handleUninstall = async (plugin) => {
-        if (!isConnected) return showToast('Establish SSH link first.', 'error');
-        if (!window.confirm(`Are you sure you want to uninstall ${plugin.name} and DELETE its data folder?`)) return;
-
-        setUninstalling(plugin.id);
+    const handleUninstall = async (name) => {
+        if (!confirm(`Uninstall ${name}?`)) return;
         try {
             const res = await fetch(`${API_BASE}/api/plugins/uninstall`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    resourceName: plugin.name,
-                    serverPath: config.path
-                })
+                body: JSON.stringify({ name, path: config.path })
             });
-            const data = await res.json();
             if (res.ok) {
-                showToast(`${plugin.name} purged. Reload required.`, 'success', {
-                    label: 'Reload Server',
-                    onClick: () => triggerReload()
-                });
+                showToast('Uninstalled successfully', 'success');
                 fetchInstalled();
-            } else showToast(`Purge failed: ${data.error}`, 'error');
-        } catch (e) { showToast('Uninstall sync failed.', 'error'); }
-        finally { setUninstalling(null); }
+            }
+        } catch (e) {
+            showToast('Error uninstalling', 'error');
+        }
     };
 
-    const isInstalled = (name) => {
-        if (!name) return false;
-        const softName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        return installed.some(f => f.toLowerCase().includes(softName));
-    };
+    if (!isConnected) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-white/40 gap-4">
+                <AlertCircle size={48} className="opacity-20" />
+                <p className="font-bold uppercase tracking-widest text-sm">Connect SSH to Manage Plugins</p>
+            </div>
+        );
+    }
 
-    const filteredPlugins = showInstalledOnly
-        ? plugins.filter(p => isInstalled(p.name))
-        : plugins;
+    const filteredStore = plugins.filter(p => !installed.some(i => i.name.toLowerCase().includes(p.name.toLowerCase())));
 
     return (
-        <div className="flex flex-col h-full overflow-hidden p-3 gap-6">
-            <header className="liquid-card p-6 flex flex-wrap items-center justify-between gap-6 shrink-0 relative z-10">
-                <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 shadow-[0_0_20px_rgba(219,39,119,0.3)] flex items-center justify-center text-white">
-                        <Package size={28} />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black text-white tracking-tight">Spiget Plugin Store</h2>
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-purple-400 mt-1"><Sparkles size={11} /> Pro Installer</div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4 flex-wrap">
-                    <button
-                        className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wide transition-all border ${showInstalledOnly
-                                ? 'bg-green-500/20 border-green-500/40 text-green-400'
-                                : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                            }`}
-                        onClick={() => setShowInstalledOnly(!showInstalledOnly)}
-                    >
-                        <Filter size={16} />
-                        <span>Filter Installed</span>
-                    </button>
-
-                    <div className="relative group">
-                        <div className="absolute inset-y-0 left-4 flex items-center text-white/30 group-focus-within:text-purple-400 transition-colors">
-                            <Search size={18} />
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/10 relative">
+            <div className="p-6 flex flex-col gap-8">
+                <header className="liquid-card p-6 flex flex-wrap items-center justify-between gap-6 shrink-0 relative z-10">
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 shadow-[0_0_20px_rgba(219,39,119,0.3)] flex items-center justify-center text-white">
+                            <Package size={28} />
                         </div>
-                        <input
-                            className="w-[300px] h-12 pl-12 pr-28 rounded-xl bg-black/20 border border-white/10 focus:border-purple-500/50 focus:bg-black/40 outline-none text-white text-sm font-medium transition-all placeholder:text-white/20"
-                            placeholder="Find next-gen plugins..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && fetchPlugins(search, 1)}
-                        />
-                        <button className="absolute inset-y-1 right-1 px-4 rounded-lg bg-white/10 hover:bg-purple-500/20 text-white/50 hover:text-purple-300 font-bold text-xs uppercase transition-colors" onClick={() => fetchPlugins(search, 1)}>Search</button>
-                    </div>
-                </div>
-            </header>
-
-            <div className="flex-1 overflow-y-auto pr-2 pb-10 scrollbar-thin scrollbar-thumb-white/10 flex flex-col gap-8">
-                {error && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="liquid-card p-12 text-center max-w-lg mx-auto flex flex-col items-center gap-6 border-red-500/30">
-                        <AlertCircle size={48} className="text-red-400 drop-shadow-[0_0_15px_rgba(248,113,113,0.5)]" />
                         <div>
-                            <h3 className="text-xl font-bold text-white mb-2">Store Connection Interrupted</h3>
-                            <p className="text-white/50">{error}</p>
+                            <h2 className="text-2xl font-black text-white tracking-tight">Plugin Store</h2>
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-pink-400 mt-1 font-mono bg-pink-500/10 px-2 py-0.5 rounded w-fit">SpigotMC Repository</span>
                         </div>
-                        <button onClick={() => fetchPlugins(search, 1)} className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-sm text-white transition-all">Retry Connection</button>
-                    </motion.div>
-                )}
-
-                {loading && page === 1 && (
-                    <div className="flex-1 flex flex-col items-center justify-center opacity-70 gap-5 min-h-[400px]">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-purple-500/30 blur-xl rounded-full" />
-                            <Loader2 className="animate-spin text-purple-400 relative z-10" size={48} />
-                        </div>
-                        <p className="text-sm font-bold uppercase tracking-widest text-white/40 animate-pulse">Querying the Multiverse...</p>
                     </div>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredPlugins.map((res, idx) => (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.05 }}
-                            key={`${res.id}-${idx}`}
-                            className="liquid-card p-6 flex flex-col gap-5 group hover:-translate-y-1 transition-transform duration-300"
-                        >
-                            {isInstalled(res.name) && (
-                                <div className="absolute top-4 right-4 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-green-500/20">
-                                    <CheckCircle size={10} /> Installed
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-4 flex items-center text-white/30 group-focus-within:text-pink-400 transition-colors">
+                                <Search size={18} />
+                            </div>
+                            <input
+                                className="w-[280px] h-12 pl-12 pr-4 rounded-xl bg-black/20 border border-white/10 focus:border-pink-500/50 focus:bg-black/40 outline-none text-white text-sm font-medium transition-all placeholder:text-white/20"
+                                placeholder="Search extensions..."
+                                value={search}
+                                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                            />
+                        </div>
+
+                        <button className="h-12 w-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all">
+                            <Filter size={20} />
+                        </button>
+                    </div>
+                </header>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    {/* Installed Section */}
+                    <div className="flex flex-col gap-6">
+                        <div className="flex items-center justify-between px-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-6 bg-pink-500 rounded-full" />
+                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white/50">Core Extensions ({installed.length})</h3>
+                            </div>
+                            <button onClick={fetchInstalled} className="text-white/20 hover:text-white transition-colors"><RefreshCw size={14} /></button>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            {installed.map((p, i) => (
+                                <motion.div key={i} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="liquid-card p-4 flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-pink-400 group-hover:bg-pink-500/10 transition-colors">
+                                            <Sparkles size={20} />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-white shrink-0">{p.name}</div>
+                                            <div className="text-[10px] font-mono text-white/30 lowercase tracking-tighter truncate max-w-[200px]">{p.name.replace('.jar', '')}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 border border-emerald-500/20">
+                                            <CheckCircle size={10} /> Active
+                                        </div>
+                                        <button onClick={() => handleUninstall(p.name)} className="w-9 h-9 rounded-lg bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 flex items-center justify-center">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Store Section */}
+                    <div className="flex flex-col gap-6">
+                        <div className="flex items-center gap-3 px-2">
+                            <div className="w-2 h-6 bg-purple-500 rounded-full" />
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white/50">Marketplace</h3>
+                        </div>
+
+                        <div className="flex flex-col gap-4 relative min-h-[400px]">
+                            {loading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-20 rounded-3xl">
+                                    <Loader2 className="animate-spin text-pink-400" size={32} />
                                 </div>
                             )}
-                            <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-black/40 overflow-hidden shrink-0 border border-white/10 shadow-lg">
-                                    {res.icon?.url ? (
-                                        <img src={`https://www.spigotmc.org/${res.icon.url}`} alt="" className="w-full h-full object-cover" />
-                                    ) : <div className="w-full h-full flex items-center justify-center text-white/20"><Package size={28} /></div>}
-                                </div>
-                                <div className="flex-1 min-w-0 pt-1">
-                                    <h3 className="font-bold text-lg text-white leading-tight truncate pr-16">{res.name}</h3>
-                                    <div className="flex items-center gap-4 mt-2">
-                                        <span className="flex items-center gap-1 text-xs font-bold text-yellow-400"><Star size={12} fill="currentColor" /> {res.rating?.average?.toFixed(1) || '0.0'}</span>
-                                        <span className="text-xs font-medium text-white/40">{res.downloads?.toLocaleString() || '0'} DLs</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <p className="text-sm text-white/60 leading-relaxed font-medium line-clamp-2 h-[2.8em]">{res.tag || 'A high-performance Minecraft resource'}</p>
 
-                            <div className="mt-auto flex gap-3">
-                                {!isInstalled(res.name) ? (
-                                    <button
-                                        className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg ${installing === res.id
-                                                ? 'bg-purple-600/50 cursor-wait'
-                                                : 'bg-gradient-to-r from-purple-600 to-pink-600 shadow-purple-600/20 text-white hover:scale-[1.02]'
-                                            }`}
-                                        onClick={() => handleInstall(res)}
-                                        disabled={installing !== null || uninstalling !== null}
+                            <AnimatePresence mode="popLayout">
+                                {plugins.map(p => (
+                                    <motion.div
+                                        key={p.id}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="liquid-card p-5 hover:bg-white/[0.04] transition-all group"
                                     >
-                                        {installing === res.id ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
-                                        {installing === res.id ? 'Processing...' : 'Quick Install'}
-                                    </button>
-                                ) : (
-                                    <button
-                                        className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-red-600 to-orange-600 shadow-lg shadow-red-600/20 text-white hover:scale-[1.02] ${uninstalling === res.id ? 'opacity-70 cursor-wait' : ''
-                                            }`}
-                                        onClick={() => handleUninstall(res)}
-                                        disabled={installing !== null || uninstalling !== null}
-                                    >
-                                        {uninstalling === res.id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                                        {uninstalling === res.id ? 'Deleting...' : 'Remove'}
-                                    </button>
-                                )}
-                                <a href={`https://www.spigotmc.org/resources/${res.id}`} target="_blank" className="w-12 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 transition-colors">
-                                    <ExternalLink size={18} />
-                                </a>
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex gap-5">
+                                                <div className="w-16 h-16 rounded-2xl bg-black/40 border border-white/5 flex items-center justify-center overflow-hidden shrink-0 group-hover:border-pink-500/30 transition-colors">
+                                                    {p.iconUrl ? <img src={p.iconUrl} className="w-full h-full object-cover" /> : <Package className="text-white/10" size={24} />}
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-bold text-white group-hover:text-pink-400 transition-colors">{p.name}</h4>
+                                                        {p.premium && <div className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 text-[8px] font-black uppercase tracking-tighter">Premium</div>}
+                                                    </div>
+                                                    <p className="text-xs text-white/40 line-clamp-2 leading-relaxed">{p.tagline}</p>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <span className="text-[10px] font-bold text-white/20 flex items-center gap-1"><Zap size={10} /> {p.downloads} DN</span>
+                                                        <span className="text-[10px] font-bold text-pink-500/40">{p.version}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleInstall(p)}
+                                                className="px-4 py-2 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-400 text-[10px] font-black uppercase tracking-widest hover:bg-pink-500 hover:text-white transition-all flex items-center gap-2"
+                                            >
+                                                GET <ArrowRight size={12} />
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+                            {/* Pagination */}
+                            <div className="flex items-center justify-center gap-2 mt-4">
+                                <button
+                                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white disabled:opacity-20 text-[10px] font-bold uppercase"
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                >
+                                    Prev
+                                </button>
+                                <span className="text-xs font-mono text-white/20">PAGE {page}</span>
+                                <button
+                                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white disabled:opacity-20 text-[10px] font-bold uppercase"
+                                    onClick={() => setPage(p => p + 1)}
+                                    disabled={plugins.length < 10}
+                                >
+                                    Next
+                                </button>
                             </div>
-                        </motion.div>
-                    ))}
+                        </div>
+                    </div>
                 </div>
-
-                {!loading && plugins.length > 0 && !showInstalledOnly && (
-                    <button className="w-full py-6 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 text-purple-400 font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 transition-colors mb-4" onClick={() => {
-                        const next = page + 1;
-                        setPage(next);
-                        fetchPlugins(search, next);
-                    }}>
-                        Discover More <ArrowRight size={18} />
-                    </button>
-                )}
+                <div className="h-20 shrink-0" />
             </div>
         </div>
     );

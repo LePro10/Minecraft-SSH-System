@@ -28,13 +28,20 @@
 
     border: var(--glass-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-glow);
+    box-shadow: var(--shadow-glow),
+      inset 0 0 20px rgba(255, 255, 255, 0.02);
+    /* Internal depth */
   }
+
+
 
   .liquid-card:hover {
     /* Slight lift effect */
     transform: translateY(-2px);
-    box-shadow: var(--shadow-glow), 0 30px 60px -10px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-glow),
+      0 30px 60px -10px rgba(0, 0, 0, 0.6),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    /* Highlight rim */
   }
 
   /* LIQUID BUTTON */
@@ -95,4 +102,59 @@
   .perspective-1000 {
     perspective: 1000px;
   }
+}
+
+/* REACT GRID LAYOUT OVERRIDES */
+.react-grid-item>.react-resizable-handle {
+  width: 24px;
+  height: 24px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  background: transparent;
+  z-index: 50 !important;
+  opacity: 1 !important;
+}
+
+.react-grid-item>.react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  border-right: 3px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0 0 2px 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.react-grid-item:hover>.react-resizable-handle::after {
+  border-color: #3b82f6;
+  width: 16px;
+  height: 16px;
+  border-right-width: 4px;
+  border-bottom-width: 4px;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+}
+
+.react-grid-item.resizing {
+  z-index: 100 !important;
+}
+
+.react-grid-item.resizing>.liquid-card {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.2) !important;
+}
+
+.react-grid-placeholder {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-radius: 20px !important;
+  opacity: 0.5 !important;
+  border: 2px dashed rgba(59, 130, 246, 0.3) !important;
+}
+
+.react-grid-item>.liquid-card {
+  height: 100%;
+  width: 100%;
 }

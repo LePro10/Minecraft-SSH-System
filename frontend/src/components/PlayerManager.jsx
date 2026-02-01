@@ -4,6 +4,12 @@ import { useSocket } from '../context/SocketContext';
 import { User, Shield, Ban, Ghost, Search, X, HandHeart, MessageSquare, Info, RefreshCw, CheckCircle, Package, Users, Trash2, Zap } from 'lucide-react';
 import { MC_ITEMS } from '../data/items';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import { GripVertical } from 'lucide-react';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const PlayerManager = () => {
     const { players, setPlayers, persistentPlayers, setPersistentPlayers, refreshPlayers, isConnected } = useServer();
@@ -12,6 +18,29 @@ const PlayerManager = () => {
     const [itemSearch, setItemSearch] = useState('');
     const [modal, setModal] = useState(null); // { type, player, isOp }
     const [modalData, setModalData] = useState({ reason: '', count: 1, item: 'diamond', msg: '' });
+
+    const defaultLayouts = {
+        lg: [
+            { i: 'registry', x: 0, y: 0, w: 12, h: 10 },
+            { i: 'whitelist', x: 0, y: 10, w: 6, h: 8 },
+            { i: 'blacklist', x: 6, y: 10, w: 6, h: 8 },
+        ],
+        md: [
+            { i: 'registry', x: 0, y: 0, w: 12, h: 10 },
+            { i: 'whitelist', x: 0, y: 10, w: 12, h: 8 },
+            { i: 'blacklist', x: 0, y: 18, w: 12, h: 8 },
+        ]
+    };
+
+    const [layouts, setLayouts] = useState(() => {
+        const saved = localStorage.getItem('player_manager_layout');
+        return saved ? JSON.parse(saved) : defaultLayouts;
+    });
+
+    const onLayoutChange = (currentLayout, allLayouts) => {
+        setLayouts(allLayouts);
+        localStorage.setItem('player_manager_layout', JSON.stringify(allLayouts));
+    };
 
     useEffect(() => {
         if (isConnected) refreshPlayers();
@@ -92,13 +121,13 @@ const PlayerManager = () => {
         );
     };
 
-    const renderTable = (list, title, icon, colorClass, category) => (
-        <div className="liquid-card flex flex-col p-6 gap-6">
-            <div className="flex items-center justify-between">
+    const renderTable = (list, title, icon, colorClass, category, key) => (
+        <div key={key} className="liquid-card flex flex-col p-6 gap-6 h-full">
+            <div className="flex items-center justify-between cursor-grab active:cursor-grabbing">
                 <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${colorClass === 'accent' ? 'bg-gradient-to-br from-blue-500 to-cyan-400 shadow-blue-500/20' :
-                            colorClass === 'success' ? 'bg-gradient-to-br from-green-500 to-emerald-400 shadow-emerald-500/20' :
-                                'bg-gradient-to-br from-red-500 to-pink-500 shadow-red-500/20'
+                        colorClass === 'success' ? 'bg-gradient-to-br from-green-500 to-emerald-400 shadow-emerald-500/20' :
+                            'bg-gradient-to-br from-red-500 to-pink-500 shadow-red-500/20'
                         }`}>
                         {icon}
                     </div>
@@ -107,32 +136,35 @@ const PlayerManager = () => {
                         {list.length > 0 && <span className="text-xs font-bold uppercase tracking-wider text-white/40">{list.length} Users Tracked</span>}
                     </div>
                 </div>
-                <button className="p-2 text-white/40 hover:text-white transition-colors" onClick={refreshPlayers}><RefreshCw size={14} /></button>
+                <div className="flex items-center gap-4">
+                    <button className="p-2 text-white/40 hover:text-white transition-colors" onMouseDown={e => e.stopPropagation()} onClick={refreshPlayers}><RefreshCw size={14} /></button>
+                    <GripVertical size={16} className="text-white/20" />
+                </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto flex-1 h-full h-min-0 scrollbar-thin scrollbar-thumb-white/10" onMouseDown={e => e.stopPropagation()}>
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="border-b border-white/5">
+                        <tr className="border-b border-white/5 sticky top-0 bg-transparent backdrop-blur-sm z-10">
                             <th className="py-4 px-2 text-xs font-bold uppercase tracking-widest text-white/30">Explorer</th>
-                            <th className="py-4 px-2 text-xs font-bold uppercase tracking-widest text-white/30">Status & Identity</th>
-                            {category !== 'whitelist' && <th className="py-4 px-2 text-xs font-bold uppercase tracking-widest text-white/30">Operations</th>}
+                            <th className="py-4 px-2 text-xs font-bold uppercase tracking-widest text-white/30">Status</th>
+                            {category !== 'whitelist' && <th className="py-4 px-2 text-xs font-bold uppercase tracking-widest text-white/30">Ops</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                         {list.length === 0 ? (
-                            <tr><td colSpan="3" className="py-8 text-center text-white/30 text-sm font-medium">No personnel detected in registry</td></tr>
+                            <tr><td colSpan="3" className="py-8 text-center text-white/30 text-sm font-medium">No personnel detected</td></tr>
                         ) : list.map((p, i) => {
                             const name = p.name || p.username;
                             return (
                                 <tr key={i} className="group hover:bg-white/[0.02] transition-colors">
                                     <td className="py-4 px-2">
                                         <div className="flex items-center gap-4">
-                                            <div className="relative w-10 h-10">
+                                            <div className="relative w-10 h-10 shrink-0">
                                                 <img src={`https://mc-heads.net/avatar/${name}/64`} alt="" className="w-full h-full rounded-xl border border-white/10 group-hover:scale-110 transition-transform duration-300" />
                                                 {p.status === 'online' && <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />}
                                             </div>
-                                            <a href={`https://namemc.com/profile/${name}`} target="_blank" className="font-bold text-white hover:text-blue-400 hover:underline">{name}</a>
+                                            <a href={`https://namemc.com/profile/${name}`} target="_blank" className="font-bold text-white hover:text-blue-400 hover:underline truncate max-w-[120px]">{name}</a>
                                         </div>
                                     </td>
                                     <td className="py-4 px-2">
@@ -141,7 +173,6 @@ const PlayerManager = () => {
                                                 }`}>
                                                 {p.status}
                                             </span>
-                                            {p.status === 'online' && <span className="text-[10px] font-mono text-white/40">{p.ip || 'Local Node'}</span>}
                                         </div>
                                     </td>
                                     {category !== 'whitelist' && (
@@ -157,7 +188,7 @@ const PlayerManager = () => {
     );
 
     return (
-        <div className="h-full overflow-y-auto pr-2 pb-20 scrollbar-thin scrollbar-thumb-white/10">
+        <div className="h-full w-full overflow-y-auto overflow-x-hidden pr-2 scrollbar-thin scrollbar-thumb-white/10">
             <AnimatePresence>
                 {modal && (
                     <motion.div
@@ -206,8 +237,8 @@ const PlayerManager = () => {
                                                     key={item.id}
                                                     onClick={() => setModalData({ ...modalData, item: item.id })}
                                                     className={`aspect-square p-2 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-all border ${modalData.item === item.id
-                                                            ? 'bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                                                            : 'bg-white/5 border-transparent hover:bg-white/10 hover:-translate-y-1'
+                                                        ? 'bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                                                        : 'bg-white/5 border-transparent hover:bg-white/10 hover:-translate-y-1'
                                                         }`}
                                                 >
                                                     <img
@@ -260,9 +291,9 @@ const PlayerManager = () => {
                                 <button
                                     onClick={executeAction}
                                     className={`px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all hover:scale-105 ${modal.type === 'ban' || modal.type === 'kick' || modal.type === 'kill'
-                                            ? 'bg-gradient-to-r from-red-600 to-orange-600 shadow-red-600/20'
-                                            : modal.type === 'give' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 shadow-blue-600/20'
-                                                : 'bg-white/10 border border-white/10'
+                                        ? 'bg-gradient-to-r from-red-600 to-orange-600 shadow-red-600/20'
+                                        : modal.type === 'give' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 shadow-blue-600/20'
+                                            : 'bg-white/10 border border-white/10'
                                         }`}
                                 >
                                     Confirm Sequence
@@ -273,13 +304,22 @@ const PlayerManager = () => {
                 )}
             </AnimatePresence>
 
-            <div className="flex flex-col gap-6">
-                {renderTable(registry, "Personnel Database", <Users size={20} />, "accent", "registry")}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {renderTable(persistentPlayers.whitelist || [], "White List", <Shield size={18} />, "success", "whitelist")}
-                    {renderTable(persistentPlayers.banned || [], "Black List", <Ban size={18} />, "danger", "banned")}
-                </div>
-            </div>
+            <ResponsiveGridLayout
+                className="layout"
+                layouts={layouts}
+                breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+                cols={{ lg: 12, md: 12, sm: 6, xs: 4, xxs: 2 }}
+                rowHeight={40}
+                margin={[16, 16]}
+                onLayoutChange={onLayoutChange}
+                draggableHandle=".cursor-grab"
+                isDraggable={true}
+                isResizable={true}
+            >
+                {renderTable(registry, "Personnel Database", <Users size={20} />, "accent", "registry", "registry")}
+                {renderTable(persistentPlayers.whitelist || [], "White List", <Shield size={18} />, "success", "whitelist", "whitelist")}
+                {renderTable(persistentPlayers.banned || [], "Black List", <Ban size={18} />, "danger", "banned", "blacklist")}
+            </ResponsiveGridLayout>
         </div>
     );
 };
