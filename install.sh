@@ -1,41 +1,26 @@
 #!/bin/bash
+# MC-Dashboard One-Line Installer
 
-# Minecraft SSH System - Installation Script
-# This script installs dependencies for both backend and frontend.
+echo "🚀 Starte automatische Installation von Minecraft SSH System..."
 
-echo "🚀 Starting installation of Minecraft SSH System..."
-
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js v18+ first."
-    exit 1
+# 1. Docker Installation prüfen
+if ! [ -x "$(command -v docker)" ]; then
+    echo "📦 Installiere Docker..."
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker $USER
 fi
 
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    echo "❌ npm is not installed. Please install npm first."
-    exit 1
-fi
+# 2. Projekt-Ordner erstellen und Repo klonen
+echo "📂 Lade Projektdaten von GitHub..."
+mkdir -p ~/mc-ssh-system && cd ~/mc-ssh-system
+# Wir klonen das Repo direkt in den Ordner
+git clone https://github.com/LePro10/Minecraft-SSH-System.git .
 
-ROOT_DIR=$(pwd)
-
-# 1. Install Backend Dependencies
-echo "📦 Installing backend dependencies..."
-cd "$ROOT_DIR/src" || exit
-npm install
-
-# 2. Install Frontend Dependencies
-echo "🎨 Installing frontend dependencies..."
-cd "$ROOT_DIR/src/frontend" || exit
-npm install
-
-# 3. Build Frontend (Optional, but recommended for production)
-# echo "🏗️ Building frontend..."
-# npm run build
-
-cd "$ROOT_DIR" || exit
+# 3. Docker Compose starten
+echo "🏗️ Starte Container (Liquid Glass Dashboard)..."
+docker compose up -d
 
 echo ""
-echo "✅ Installation complete!"
-echo "👉 You can now start the application by running 'npm start' in the src directory (if configured) or using 'src/start.bat' on Windows."
-echo "👉 Alternatively, use 'docker-compose up -d' for containerized deployment."
+echo "✅ Installation erfolgreich abgeschlossen!"
+echo "👉 Dein Dashboard ist jetzt erreichbar unter: http://$(hostname -I | cut -d' ' -f1):5173"
+echo "👉 Login mit deinen SSH-Daten im Web-Interface."
