@@ -1,7 +1,7 @@
 {
   "path": "/home/serverusr/mcserver",
   "screenName": "minecraft",
-  "startScript": "./run.sh",
+  "startScript": "./start.sh",
   "stopScript": "stop",
   "theme": "glass",
   "wallpaper": "/uploads/wallpaper-1769858756618.jpg"

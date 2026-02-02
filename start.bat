@@ -22,9 +22,14 @@ start "SMM Backend" node backend/src/server.js
 echo [SMM] Starting Frontend...
 start "SMM Frontend" /d "%ROOT%frontend" npm run dev
 
+:: Start Shop
+echo [SMM] Starting Shop...
+start "SMM Shop" /d "%ROOT%shop" npm run dev
+
 echo.
-echo [SMM] Both services are starting in separate windows.
+echo [SMM] All services are starting in separate windows.
 echo [SMM] Frontend: http://localhost:5173
 echo [SMM] Backend: http://localhost:3001
+echo [SMM] Shop: http://localhost:3002
 echo.
 pause
