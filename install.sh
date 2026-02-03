@@ -1,15 +1,16 @@
 #!/bin/bash
 
 ###############################################################################
-# Minecraft SSH System - Universal Zero-Config Installer
+# Minecraft SSH System - Universal Zero-Config Installer v3.0
 # 
 # This script automatically:
 # - Checks and installs Docker if needed
-# - Creates project directory structure
-# - Sets up proper permissions
+# - Handles user permissions intelligently (sudo vs root)
+# - Creates project directory structure with correct ownership
+# - Sets up proper file permissions for uploads and configs
 # - Deploys the complete system
 # 
-# Usage: curl -fsSL https://your-repo/install.sh | bash
+# Usage: bash install.sh  OR  curl -fsSL https://your-repo/install.sh | bash
 ###############################################################################
 
 set -e  # Exit on any error
@@ -44,31 +45,45 @@ echo -e "${NC}"
 echo -e "${BLUE}🚀 Starting Zero-Config Installation...${NC}\n"
 
 ###############################################################################
-# 1. Check System Requirements
+# 1. Intelligent User & Permission Detection
 ###############################################################################
 
-echo -e "${YELLOW}[1/6]${NC} Checking system requirements..."
+echo -e "${YELLOW}[1/7]${NC} Detecting user and permissions..."
 
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-   echo -e "${RED}⚠️  This script should NOT be run as root. Please run as a regular user with sudo privileges.${NC}"
-   exit 1
+# Detect the real user (even if script is run with sudo)
+if [ -n "$SUDO_USER" ]; then
+    REAL_USER="$SUDO_USER"
+    REAL_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    echo -e "${CYAN}🔍 Detected: Running with sudo as user ${REAL_USER}${NC}"
+elif [ "$EUID" -eq 0 ]; then
+    echo -e "${RED}❌ This script should NOT be run as root user.${NC}"
+    echo -e "${YELLOW}💡 Please run as a regular user:${NC}"
+    echo -e "${YELLOW}   bash install.sh${NC}"
+    echo -e "${YELLOW}   OR${NC}"
+    echo -e "${YELLOW}   curl -fsSL https://your-repo/install.sh | bash${NC}"
+    exit 1
+else
+    REAL_USER="$USER"
+    REAL_HOME="$HOME"
+    echo -e "${CYAN}🔍 Detected: Running as user ${REAL_USER}${NC}"
 fi
 
-# Check for sudo privileges
-if ! sudo -n true 2>/dev/null; then
-    echo -e "${YELLOW}👤 This script requires sudo privileges. You may be prompted for your password.${NC}"
-    sudo -v
-fi
+echo -e "${GREEN}✅ User: ${REAL_USER}, Home: ${REAL_HOME}${NC}"
 
-# Keep sudo alive
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+# Function to run commands as the real user (not root)
+run_as_user() {
+    if [ -n "$SUDO_USER" ]; then
+        sudo -u "$SUDO_USER" "$@"
+    else
+        "$@"
+    fi
+}
 
 ###############################################################################
 # 2. Install Docker if needed
 ###############################################################################
 
-echo -e "${YELLOW}[2/6]${NC} Checking Docker installation..."
+echo -e "\n${YELLOW}[2/7]${NC} Checking Docker installation..."
 
 if ! command -v docker &> /dev/null; then
     echo -e "${CYAN}📦 Docker not found. Installing Docker...${NC}"
@@ -112,12 +127,33 @@ if ! command -v docker &> /dev/null; then
             ;;
     esac
     
-    # Add current user to docker group
-    sudo usermod -aG docker $USER
     echo -e "${GREEN}✅ Docker installed successfully!${NC}"
-    echo -e "${YELLOW}📋 Note: You may need to log out and back in for Docker group changes to take effect.${NC}"
 else
     echo -e "${GREEN}✅ Docker is already installed${NC}"
+fi
+
+###############################################################################
+# 3. Docker Group & Permissions Setup
+###############################################################################
+
+echo -e "\n${YELLOW}[3/7]${NC} Configuring Docker permissions..."
+
+# Check if user is in docker group
+if ! groups "$REAL_USER" | grep -q '\bdocker\b'; then
+    echo -e "${CYAN}➕ Adding ${REAL_USER} to docker group...${NC}"
+    sudo usermod -aG docker "$REAL_USER"
+    echo -e "${GREEN}✅ User added to docker group${NC}"
+    
+    echo -e "\n${YELLOW}⚠️  IMPORTANT: Docker group membership activated!${NC}"
+    echo -e "${YELLOW}You have two options to apply the changes:${NC}"
+    echo -e "${YELLOW}  1. Run: ${BLUE}newgrp docker${YELLOW} (recommended - immediate effect)${NC}"
+    echo -e "${YELLOW}  2. Log out and log back in${NC}\n"
+    
+    # Try to continue with newgrp for this session
+    NEEDS_NEWGRP=true
+else
+    echo -e "${GREEN}✅ User ${REAL_USER} is already in docker group${NC}"
+    NEEDS_NEWGRP=false
 fi
 
 # Check if docker compose is available
@@ -129,12 +165,12 @@ fi
 echo -e "${GREEN}✅ Docker Compose is ready${NC}"
 
 ###############################################################################
-# 3. Create Project Directory
+# 4. Create Project Directory (with correct ownership)
 ###############################################################################
 
-echo -e "\n${YELLOW}[3/6]${NC} Setting up project directory..."
+echo -e "\n${YELLOW}[4/7]${NC} Setting up project directory..."
 
-PROJECT_DIR="$HOME/mc-ssh-system"
+PROJECT_DIR="${REAL_HOME}/mc-ssh-system"
 
 if [[ -d "$PROJECT_DIR" ]]; then
     echo -e "${YELLOW}⚠️  Directory $PROJECT_DIR already exists.${NC}"
@@ -142,51 +178,66 @@ if [[ -d "$PROJECT_DIR" ]]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo -e "${CYAN}🗑️  Removing existing directory...${NC}"
-        rm -rf "$PROJECT_DIR"
+        sudo rm -rf "$PROJECT_DIR"
     else
-        echo -e "${RED}❌ Installation cancelled.${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Using existing directory. Continuing installation...${NC}"
     fi
 fi
 
-mkdir -p "$PROJECT_DIR"
+# Create directory as real user (not root)
+echo -e "${CYAN}📁 Creating project directory: $PROJECT_DIR${NC}"
+run_as_user mkdir -p "$PROJECT_DIR"
+
+# Ensure correct ownership
+sudo chown -R "$REAL_USER:$REAL_USER" "$PROJECT_DIR"
+
+echo -e "${GREEN}✅ Project directory created with correct ownership${NC}"
+
+###############################################################################
+# 5. Clone/Download Repository (as real user)
+###############################################################################
+
+echo -e "\n${YELLOW}[5/7]${NC} Downloading project files..."
+
 cd "$PROJECT_DIR"
-
-echo -e "${GREEN}✅ Project directory created: $PROJECT_DIR${NC}"
-
-###############################################################################
-# 4. Clone/Download Repository
-###############################################################################
-
-echo -e "\n${YELLOW}[4/6]${NC} Downloading project files..."
 
 # Check if git is available and clone the repository
 if command -v git &> /dev/null; then
-    echo -e "${CYAN}📥 Cloning repository from GitHub...${NC}"
-    git clone https://github.com/LePro10/Minecraft-SSH-System.git .
-    echo -e "${GREEN}✅ Repository cloned successfully${NC}"
+    if [[ ! -d ".git" ]]; then
+        echo -e "${CYAN}📥 Cloning repository from GitHub...${NC}"
+        run_as_user git clone https://github.com/LePro10/Minecraft-SSH-System.git .
+        echo -e "${GREEN}✅ Repository cloned successfully${NC}"
+    else
+        echo -e "${CYAN}🔄 Updating existing repository...${NC}"
+        run_as_user git pull
+        echo -e "${GREEN}✅ Repository updated${NC}"
+    fi
 else
     echo -e "${RED}❌ Git not found. Please install git first.${NC}"
     exit 1
 fi
 
+# Ensure all files belong to the real user
+sudo chown -R "$REAL_USER:$REAL_USER" "$PROJECT_DIR"
+
 ###############################################################################
-# 5. Set Up Directory Structure and Permissions
+# 6. Set Up Directory Structure & Critical Permissions
 ###############################################################################
 
-echo -e "\n${YELLOW}[5/6]${NC} Configuring directory structure and permissions..."
+echo -e "\n${YELLOW}[6/7]${NC} Configuring directory structure and permissions..."
 
-# Create necessary directories
-mkdir -p src/backend/uploads
-mkdir -p src/backend/config
-mkdir -p src/frontend
-mkdir -p src/uploads
+# Create necessary directories (as real user)
+echo -e "${CYAN}📁 Creating required directories...${NC}"
+run_as_user mkdir -p src/backend/uploads
+run_as_user mkdir -p src/backend/config
+run_as_user mkdir -p src/frontend
+run_as_user mkdir -p src/uploads
 
-# Create config.json if it doesn't exist
+# Create config.json if it doesn't exist (as real user)
 CONFIG_FILE="src/backend/config.json"
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo -e "${CYAN}📝 Creating default configuration file...${NC}"
-    cat > "$CONFIG_FILE" << 'JSON'
+    run_as_user tee "$CONFIG_FILE" > /dev/null << 'JSON'
 {
   "ssh": {
     "host": "127.0.0.1",
@@ -203,28 +254,50 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 JSON
 fi
 
-# Set proper permissions for uploads directory
-echo -e "${CYAN}🔐 Setting permissions for uploads directory...${NC}"
-chmod -R 777 src/backend/uploads 2>/dev/null || sudo chmod -R 777 src/backend/uploads
-chmod -R 777 src/uploads 2>/dev/null || sudo chmod -R 777 src/uploads
+# CRITICAL: Set proper permissions for uploads and config
+# This prevents "Permission Denied" errors from the backend
+echo -e "${CYAN}🔐 Setting critical permissions for uploads and configs...${NC}"
 
-echo -e "${GREEN}✅ Directory structure configured${NC}"
+# Make sure uploads directories are writable by Docker container
+sudo chmod -R 777 src/backend/uploads
+sudo chmod -R 777 src/uploads
+
+# Make config.json writable
+sudo chmod 666 src/backend/config.json
+
+# Ensure user ownership
+sudo chown -R "$REAL_USER:$REAL_USER" src/
+
+echo -e "${GREEN}✅ Permissions configured:${NC}"
+echo -e "${GREEN}   • Uploads: 777 (read/write/execute for all)${NC}"
+echo -e "${GREEN}   • Config: 666 (read/write for all)${NC}"
+echo -e "${GREEN}   • Owner: ${REAL_USER}${NC}"
 
 ###############################################################################
-# 6. Build and Deploy with Docker Compose
+# 7. Build and Deploy with Docker Compose
 ###############################################################################
 
-echo -e "\n${YELLOW}[6/6]${NC} Building and deploying containers..."
+echo -e "\n${YELLOW}[7/7]${NC} Building and deploying containers..."
 
 echo -e "${CYAN}🏗️  Building Docker images (this may take a few minutes)...${NC}"
 
 # Stop and remove existing containers
-docker compose down 2>/dev/null || true
+if $NEEDS_NEWGRP; then
+    echo -e "${YELLOW}⚠️  Activating docker group for this session...${NC}"
+    # Use sg (newgrp alternative that works in scripts)
+    sg docker -c "docker compose down 2>/dev/null || true"
+    sg docker -c "docker compose up -d --build"
+    BUILD_RESULT=$?
+else
+    docker compose down 2>/dev/null || true
+    docker compose up -d --build
+    BUILD_RESULT=$?
+fi
 
-# Build and start with latest changes
-docker compose up -d --build
+# Ensure correct ownership of any files created by Docker
+sudo chown -R "$REAL_USER:$REAL_USER" "$PROJECT_DIR"
 
-if [[ $? -eq 0 ]]; then
+if [[ $BUILD_RESULT -eq 0 ]]; then
     echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║                                                          ║${NC}"
     echo -e "${GREEN}║  ✅  INSTALLATION SUCCESSFUL!                           ║${NC}"
@@ -244,18 +317,34 @@ if [[ $? -eq 0 ]]; then
     echo -e "   ${BLUE}Restart:${NC}          docker compose restart"
     echo -e "   ${BLUE}Update:${NC}           docker compose up -d --build"
     echo -e ""
-    echo -e "${YELLOW}💡 Tips:${NC}"
-    echo -e "   • The system automatically detects local vs remote SSH connections"
-    echo -e "   • For local server: Use IP ${BLUE}127.0.0.1${NC} in the dashboard"
+    
+    if $NEEDS_NEWGRP; then
+        echo -e "${YELLOW}⚠️  IMPORTANT NEXT STEP:${NC}"
+        echo -e "${YELLOW}To use Docker commands without sudo, please run:${NC}"
+        echo -e "${BLUE}   newgrp docker${NC}"
+        echo -e "${YELLOW}Or log out and log back in.${NC}"
+        echo -e ""
+    fi
+    
+    echo -e "${YELLOW}💡 Usage Tips:${NC}"
+    echo -e "   • The system automatically detects local vs remote SSH"
+    echo -e "   • For local server: Use IP ${BLUE}127.0.0.1${NC} in dashboard"
     echo -e "   • For remote server: Use the actual ${BLUE}server IP${NC}"
     echo -e "   • All configuration is saved automatically"
+    echo -e "   • Uploads and configs have correct permissions (777/666)"
     echo -e ""
     echo -e "${GREEN}🎮 Enjoy your Liquid Glass Dashboard!${NC}\n"
 else
     echo -e "\n${RED}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${RED}║  ❌  Installation Failed                                 ║${NC}"
     echo -e "${RED}╚══════════════════════════════════════════════════════════╝${NC}\n"
-    echo -e "${YELLOW}Please check the error messages above and try again.${NC}"
-    echo -e "${YELLOW}For support, check the logs with: docker compose logs${NC}\n"
+    echo -e "${YELLOW}Possible issues and solutions:${NC}"
+    echo -e "${YELLOW}1. Docker permissions: ${NC}"
+    echo -e "   Run: ${BLUE}newgrp docker${NC}"
+    echo -e "${YELLOW}2. Check logs: ${NC}"
+    echo -e "   Run: ${BLUE}docker compose logs${NC}"
+    echo -e "${YELLOW}3. Retry installation: ${NC}"
+    echo -e "   Run: ${BLUE}bash install.sh${NC}"
+    echo -e ""
     exit 1
 fi
