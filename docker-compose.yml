@@ -5,8 +5,7 @@ services:
     build:
       context: .
       dockerfile: backend.Dockerfile
-    ports:
-      - "3001:3001"
+    network_mode: "host"  # <--- Hinzufügen!
     volumes:
       - ./src/backend/config.json:/app/backend/config.json
       - ./src/uploads:/app/uploads
@@ -16,8 +15,7 @@ services:
     build:
       context: .
       dockerfile: frontend.Dockerfile
-    ports:
-      - "5173:80"
+    network_mode: "host"  # <--- Hinzufügen!
     depends_on:
       - backend
     restart: always
