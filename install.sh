@@ -160,16 +160,14 @@ echo -e "${GREEN}✅ Project directory created: $PROJECT_DIR${NC}"
 
 echo -e "\n${YELLOW}[4/6]${NC} Downloading project files..."
 
-# Check if this script is being run from a git repository
-if [[ -d ".git" ]]; then
-    echo -e "${GREEN}✅ Already in a git repository${NC}"
-elif command -v git &> /dev/null; then
-    echo -e "${CYAN}📥 Cloning repository...${NC}"
-    # Replace with your actual repository URL
-    # git clone https://github.com/yourusername/mc-ssh-system.git .
-    echo -e "${YELLOW}⚠️  Git repository URL not configured. Assuming files are already present.${NC}"
+# Check if git is available and clone the repository
+if command -v git &> /dev/null; then
+    echo -e "${CYAN}📥 Cloning repository from GitHub...${NC}"
+    git clone https://github.com/LePro10/Minecraft-SSH-System.git .
+    echo -e "${GREEN}✅ Repository cloned successfully${NC}"
 else
-    echo -e "${YELLOW}⚠️  Git not found. Assuming files are already present in current directory.${NC}"
+    echo -e "${RED}❌ Git not found. Please install git first.${NC}"
+    exit 1
 fi
 
 ###############################################################################
