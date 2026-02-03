@@ -117,7 +117,7 @@ const Settings = ({ theme, setTheme, prefill }) => {
     const updateTheme = async (newTheme) => {
         setTheme(newTheme);
         try {
-            await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/settings`, {
+            await fetch(`http://${window.location.hostname}:3001/api/settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ theme: newTheme })

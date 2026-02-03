@@ -27,8 +27,8 @@ const LiquidMetricCard = ({ title, sub, value, unit, icon: Icon, color, percent,
 
         <div className="flex items-start justify-between mb-4">
             <div className={`p-3 rounded-2xl bg-gradient-to-br transition-all duration-500 group-hover:scale-110 shadow-lg ${color === 'blue' ? 'from-[var(--accent-primary)]/20 to-[var(--accent-secondary,var(--accent-primary))]/20 text-[var(--accent-primary)] shadow-[var(--accent-primary)]/10' :
-                    color === 'red' ? 'from-rose-500/20 to-orange-500/20 text-rose-400 shadow-rose-500/10' :
-                        'from-emerald-500/20 to-teal-500/20 text-emerald-400 shadow-emerald-500/10'
+                color === 'red' ? 'from-rose-500/20 to-orange-500/20 text-rose-400 shadow-rose-500/10' :
+                    'from-emerald-500/20 to-teal-500/20 text-emerald-400 shadow-emerald-500/10'
                 }`}>
                 <Icon size={24} />
             </div>
@@ -47,8 +47,8 @@ const LiquidMetricCard = ({ title, sub, value, unit, icon: Icon, color, percent,
             <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-[1px]">
                 <motion.div
                     className={`h-full rounded-full ${color === 'blue' ? 'bg-[var(--accent-primary)] shadow-[0_0_15px_var(--accent-primary)]' :
-                            color === 'red' ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]' :
-                                'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]'
+                        color === 'red' ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]' :
+                            'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]'
                         }`}
                     initial={{ width: 0 }}
                     animate={{ width: `${percent}%` }}
@@ -164,7 +164,7 @@ const Dashboard = ({ onNavigate }) => {
     };
 
     const control = async (action) => {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const API_URL = `http://${window.location.hostname}:3001`;
         try {
             const res = await fetch(`${API_URL}/api/mc/control`, {
                 method: 'POST',

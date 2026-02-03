@@ -5,19 +5,27 @@ services:
     build:
       context: .
       dockerfile: backend.Dockerfile
-    ports:
-      - "3001:3001"
+    network_mode: "host"
     volumes:
       - ./src/backend/config.json:/app/backend/config.json
-      - ./src/uploads:/app/uploads
+      - ./src/backend/uploads:/app/uploads
     restart: always
+    environment:
+      - NODE_ENV=production
+    # Host network mode allows:
+    # - Direct access to SSH port (22) on the host
+    # - Backend accessible on port 3001
+    # - No complex port mapping needed
 
   frontend:
     build:
       context: .
       dockerfile: frontend.Dockerfile
-    ports:
-      - "5173:80"
+    network_mode: "host"
     depends_on:
       - backend
     restart: always
+    # Host network mode allows:
+    # - Frontend accessible on port 80 (nginx default)
+    # - Direct communication with backend on localhost:3001
+    # - No need for Docker network bridge

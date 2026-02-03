@@ -7,9 +7,9 @@ COPY src/frontend/package*.json ./
 RUN npm install
 
 COPY src/frontend/ ./
-# Set the API URL for the build
-ENV VITE_API_URL=http://localhost:3001
+# No static API URL - Frontend uses dynamic window.location.hostname:3001
 RUN npm run build
+
 
 # Production stage
 FROM nginx:stable-alpine
