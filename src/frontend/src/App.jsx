@@ -85,7 +85,7 @@ function AppContent() {
 
     const loadSettings = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const API_URL = `http://${window.location.hostname}:3001`;
         const response = await fetch(`${API_URL}/api/settings`);
         const settings = await response.json();
         if (settings.theme) setTheme(settings.theme);

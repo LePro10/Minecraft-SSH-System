@@ -10,7 +10,10 @@ export const SocketProvider = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
-        const newSocket = io('http://localhost:3001'); // Hardcoded for prototype
+        // Dynamic API URL - Auto-detects backend location (Zero-Config)
+        const API_URL = `http://${window.location.hostname}:3001`;
+        const newSocket = io(API_URL);
+
 
         newSocket.on('connect', () => {
             console.log('Socket connected');

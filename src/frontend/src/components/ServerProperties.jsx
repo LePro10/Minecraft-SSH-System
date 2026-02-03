@@ -17,7 +17,7 @@ const ServerProperties = () => {
     const [filter, setFilter] = useState('');
     const [original, setOriginal] = useState({});
 
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_BASE = `http://${window.location.hostname}:3001`;
 
     useEffect(() => {
         if (isConnected && config?.path) {

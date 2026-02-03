@@ -15,7 +15,7 @@ const PluginManager = () => {
     const [page, setPage] = useState(1);
     const [view, setView] = useState('store'); // 'store' or 'installed'
 
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const API_BASE = `http://${window.location.hostname}:3001`;
 
     useEffect(() => {
         if (isConnected) {
