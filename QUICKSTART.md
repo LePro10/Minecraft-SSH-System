@@ -8,9 +8,20 @@ curl -fsSL https://raw.githubusercontent.com/LePro10/Minecraft-SSH-System/main/i
 
 **Das war's!** Der Installer macht alles automatisch:
 - ✅ Prüft und installiert Docker
+- ✅ Fügt dich zur docker-Gruppe hinzu
 - ✅ Erstellt ~/mc-ssh-system Verzeichnis
-- ✅ Setzt alle Berechtigungen
+- ✅ Setzt alle Berechtigungen (777 für uploads, 666 für config)
 - ✅ Baut und startet das System
+
+### ⚠️ Wichtig nach der Installation
+
+Falls du zur docker-Gruppe hinzugefügt wurdest, führe aus:
+
+```bash
+newgrp docker
+```
+
+**Oder** logge dich aus und wieder ein. Dies aktiviert die Docker-Rechte sofort!
 
 ## Zugriff
 
@@ -109,6 +120,46 @@ docker compose logs
 
 # Neustart
 docker compose restart
+```
+
+### "Permission denied" beim Docker-Befehl?
+
+**Problem:** Du bist nicht in der docker-Gruppe.
+
+**Lösung:**
+```bash
+# Sofort aktivieren (für diese Session)
+newgrp docker
+
+# Oder: Logout + Login für permanente Aktivierung
+```
+
+**Prüfen:**
+```bash
+groups  # Sollte 'docker' enthalten
+docker ps  # Sollte ohne sudo funktionieren
+```
+
+### Backend kann keine Dateien hochladen?
+
+**Problem:** Uploads-Ordner hat falsche Rechte.
+
+**Lösung:**
+```bash
+cd ~/mc-ssh-system
+chmod -R 777 src/backend/uploads src/uploads
+chown -R $USER:$USER src/
+```
+
+### Config-Speicherung schlägt fehl?
+
+**Problem:** config.json ist nicht beschreibbar.
+
+**Lösung:**
+```bash
+cd ~/mc-ssh-system
+chmod 666 src/backend/config.json
+chown $USER:$USER src/backend/config.json
 ```
 
 ### SSH-Verbindung schlägt fehl?
